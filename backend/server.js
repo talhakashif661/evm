@@ -24,6 +24,33 @@ if (missingEnvVars.length > 0) {
 
 const PORT = process.env.PORT || 5000;
 
+// Verify the database is actually reachable before we start accepting traffic.
+// Without this, a bad DATABASE_URL, an unreachable DB, or (on a fresh machine)
+// an ungenerated Prisma client only surfaces as an opaque 500 on the first
+// request that happens to hit the database — or, in the client-not-generated
+// case, as a raw stack trace deep in @prisma/client. A cheap SELECT 1 here
+// turns all of those into one clear, actionable boot-time message. Skipped
+// under NODE_ENV=test, where app.js is imported directly against a mock and
+// this server file never runs.
+async function verifyDatabaseConnection() {
+  if (process.env.NODE_ENV === 'test') return;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    logger.info('Database connection verified');
+  } catch (err) {
+    logger.error(
+      'Could not connect to the database at boot. The server will not start.\n' +
+        `  Reason: ${err.message}\n` +
+        '  Checklist:\n' +
+        '    1. Is DATABASE_URL in backend/.env correct and reachable?\n' +
+        '    2. Is the database server actually running?\n' +
+        '    3. Has the Prisma client been generated? Run: npx prisma generate\n' +
+        '       (this needs internet access on first run to download the query engine)'
+    );
+    process.exit(1);
+  }
+}
+
 // Socket.IO needs a raw http.Server (not the Express app) to attach to, so
 // requests still flow through Express exactly as before — this just adds a
 // WebSocket upgrade path alongside it for real-time auction/bid updates.
@@ -52,10 +79,16 @@ if (process.env.NODE_ENV !== 'test') {
   }, 30 * 1000);
 }
 
-httpServer.listen(PORT, () => {
-  logger.info(`EV Management Server running on port ${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV}`);
-});
+async function start() {
+  await verifyDatabaseConnection();
+
+  httpServer.listen(PORT, () => {
+    logger.info(`EV Management Server running on port ${PORT}`);
+    logger.info(`Environment: ${process.env.NODE_ENV}`);
+  });
+}
+
+start();
 
 // PaaS platforms (Render, Railway, etc.) send SIGTERM before force-killing a
 // container on redeploy/scale-down. Without handling it, in-flight requests

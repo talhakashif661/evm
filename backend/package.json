@@ -12,10 +12,11 @@
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
     "prisma:generate": "prisma generate",
+    "doctor": "node scripts/doctor.mjs",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
     "lint": "eslint .",
-    "format": "prettier --write \"**/*.js\" --ignore-path ../.gitignore",
-    "format:check": "prettier --check \"**/*.js\" --ignore-path ../.gitignore"
+    "format": "prettier --write \"**/*.{js,mjs}\" --ignore-path ../.gitignore",
+    "format:check": "prettier --check \"**/*.{js,mjs}\" --ignore-path ../.gitignore"
   },
   "engines": {
     "node": ">=18.18.0"
