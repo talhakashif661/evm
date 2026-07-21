@@ -10,7 +10,7 @@ import {
   resetPassword,
 } from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.js';
+import { validate } from '../middleware/validate.middleware.js';
 import {
   registerRules,
   loginRules,

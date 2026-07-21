@@ -11,7 +11,7 @@ import {
   getAuditLogs,
 } from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
-import { validateQuery } from '../middleware/validateQuery.js';
+import { validateQuery } from '../middleware/validateQuery.middleware.js';
 
 const router = express.Router();
 

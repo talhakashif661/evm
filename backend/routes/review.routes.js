@@ -2,7 +2,7 @@ import express from 'express';
 import { upsertReview, getStationReviews, deleteReview } from '../controllers/review.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { requireVerified } from '../middleware/kyc.middleware.js';
-import { validate } from '../middleware/validate.js';
+import { validate } from '../middleware/validate.middleware.js';
 import { createReviewRules } from '../validators/reviewValidators.js';
 
 const router = express.Router();

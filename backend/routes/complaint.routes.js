@@ -6,7 +6,7 @@ import {
   deleteComplaint,
 } from '../controllers/complaint.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.js';
+import { validate } from '../middleware/validate.middleware.js';
 import { createComplaintRules } from '../validators/complaintValidators.js';
 
 const router = express.Router();

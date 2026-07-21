@@ -10,7 +10,7 @@ import {
 } from '../controllers/booking.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { requireVerified } from '../middleware/kyc.middleware.js';
-import { validate } from '../middleware/validate.js';
+import { validate } from '../middleware/validate.middleware.js';
 import { createBookingRules } from '../validators/bookingValidators.js';
 
 const router = express.Router();
