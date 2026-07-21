@@ -1,7 +1,12 @@
 import express from 'express';
 import {
-  createBooking, getMyBookings, cancelBooking, completeBooking,
-  checkIn, createBookingPaymentIntent, ownerCancelBooking
+  createBooking,
+  getMyBookings,
+  cancelBooking,
+  completeBooking,
+  checkIn,
+  createBookingPaymentIntent,
+  ownerCancelBooking,
 } from '../controllers/booking.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { requireVerified } from '../middleware/kyc.middleware.js';

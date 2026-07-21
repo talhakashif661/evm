@@ -21,7 +21,7 @@ export function getSocket() {
     socket = io(SOCKET_URL, {
       autoConnect: true,
       transports: ['websocket', 'polling'],
-      auth: { token: localStorage.getItem('ev_token') || undefined }
+      auth: { token: localStorage.getItem('ev_token') || undefined },
     });
   }
   return socket;

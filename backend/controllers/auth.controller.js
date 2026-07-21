@@ -22,11 +22,15 @@ export const register = async (req, res, next) => {
     const { name, email, password, role, phone } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email and password are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Name, email and password are required' });
     }
 
     if (!['EV_USER', 'STATION_OWNER'].includes(role)) {
-      return res.status(400).json({ success: false, message: 'Invalid role. Must be EV_USER or STATION_OWNER' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid role. Must be EV_USER or STATION_OWNER' });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -38,7 +42,7 @@ export const register = async (req, res, next) => {
 
     const user = await prisma.user.create({
       data: { name, email, password: hashedPassword, role, phone },
-      select: { id: true, name: true, email: true, role: true, isVerified: true, createdAt: true }
+      select: { id: true, name: true, email: true, role: true, isVerified: true, createdAt: true },
     });
 
     const token = generateToken({ id: user.id, email: user.email, role: user.role });
@@ -57,7 +61,7 @@ export const register = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: 'Account created successfully. Please check your email to verify your account.',
-      data: { user, token }
+      data: { user, token },
     });
   } catch (error) {
     next(error);
@@ -78,21 +82,35 @@ export const register = async (req, res, next) => {
 export const setupAdmin = async (req, res, next) => {
   try {
     const setupKey = req.headers['x-setup-key'] || req.body.setupKey;
-    if (!process.env.ADMIN_SETUP_KEY || !setupKey || !timingSafeEqualStrings(setupKey, process.env.ADMIN_SETUP_KEY)) {
+    if (
+      !process.env.ADMIN_SETUP_KEY ||
+      !setupKey ||
+      !timingSafeEqualStrings(setupKey, process.env.ADMIN_SETUP_KEY)
+    ) {
       return res.status(403).json({ success: false, message: 'Invalid or missing setup key' });
     }
 
     const existingAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
     if (existingAdmin) {
-      return res.status(409).json({ success: false, message: 'An admin account already exists. Use the admin panel to manage users from here on.' });
+      return res
+        .status(409)
+        .json({
+          success: false,
+          message:
+            'An admin account already exists. Use the admin panel to manage users from here on.',
+        });
     }
 
     const { name, email, password, phone } = req.body;
     if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email and password are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Name, email and password are required' });
     }
     if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -111,15 +129,24 @@ export const setupAdmin = async (req, res, next) => {
     // and 403s instead of leaving two admins behind.
     const admin = await prisma.user.create({
       data: { name, email, password: hashedPassword, role: 'ADMIN', phone, isVerified: true },
-      select: { id: true, name: true, email: true, role: true, isVerified: true, createdAt: true }
+      select: { id: true, name: true, email: true, role: true, isVerified: true, createdAt: true },
     });
 
-    const allAdmins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+    const allAdmins = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { id: true },
+    });
     if (allAdmins.length > 1) {
-      const winnerId = allAdmins.map(a => a.id).sort()[0];
+      const winnerId = allAdmins.map((a) => a.id).sort()[0];
       if (admin.id !== winnerId) {
         await prisma.user.delete({ where: { id: admin.id } });
-        return res.status(409).json({ success: false, message: 'An admin account already exists. Use the admin panel to manage users from here on.' });
+        return res
+          .status(409)
+          .json({
+            success: false,
+            message:
+              'An admin account already exists. Use the admin panel to manage users from here on.',
+          });
       }
     }
 
@@ -128,12 +155,16 @@ export const setupAdmin = async (req, res, next) => {
     logger.info(`Admin account bootstrapped via /setup-admin: ${admin.email}`);
     // req.user doesn't exist here (this endpoint is pre-auth), so record the
     // new admin as the actor of their own bootstrap.
-    audit({ user: { id: admin.id }, ip: req.ip }, 'ADMIN_BOOTSTRAPPED', `First admin created: ${admin.email}`);
+    audit(
+      { user: { id: admin.id }, ip: req.ip },
+      'ADMIN_BOOTSTRAPPED',
+      `First admin created: ${admin.email}`
+    );
 
     res.status(201).json({
       success: true,
       message: 'Admin account created and saved permanently in MongoDB.',
-      data: { user: admin, token }
+      data: { user: admin, token },
     });
   } catch (error) {
     next(error);
@@ -152,10 +183,11 @@ export const forgotPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    const genericResponse = () => res.json({
-      success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.'
-    });
+    const genericResponse = () =>
+      res.json({
+        success: true,
+        message: 'If an account with that email exists, a password reset link has been sent.',
+      });
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return genericResponse();
@@ -166,7 +198,7 @@ export const forgotPassword = async (req, res, next) => {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { resetTokenHash: tokenHash, resetTokenExpiry }
+      data: { resetTokenHash: tokenHash, resetTokenExpiry },
     });
 
     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`;
@@ -184,10 +216,14 @@ export const resetPassword = async (req, res, next) => {
   try {
     const { email, token, newPassword } = req.body;
     if (!email || !token || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Email, token and new password are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Email, token and new password are required' });
     }
     if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'New password must be at least 6 characters' });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
@@ -195,7 +231,9 @@ export const resetPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired reset link' });
     }
     if (user.resetTokenExpiry < new Date()) {
-      return res.status(400).json({ success: false, message: 'Reset link has expired. Please request a new one.' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Reset link has expired. Please request a new one.' });
     }
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -206,11 +244,14 @@ export const resetPassword = async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedPassword, resetTokenHash: null, resetTokenExpiry: null }
+      data: { password: hashedPassword, resetTokenHash: null, resetTokenExpiry: null },
     });
 
     logger.info(`Password reset completed for ${email}`);
-    res.json({ success: true, message: 'Password reset successful. You can now log in with your new password.' });
+    res.json({
+      success: true,
+      message: 'Password reset successful. You can now log in with your new password.',
+    });
   } catch (error) {
     next(error);
   }
@@ -233,9 +274,17 @@ export const login = async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
-        id: true, name: true, email: true, password: true, role: true,
-        isBlocked: true, isVerified: true, phone: true, avatar: true, createdAt: true
-      }
+        id: true,
+        name: true,
+        email: true,
+        password: true,
+        role: true,
+        isBlocked: true,
+        isVerified: true,
+        phone: true,
+        avatar: true,
+        createdAt: true,
+      },
     });
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -259,7 +308,7 @@ export const login = async (req, res, next) => {
       message: user.isVerified
         ? 'Login successful'
         : 'Login successful. Please verify your email to unlock all features.',
-      data: { user: userWithoutPassword, token }
+      data: { user: userWithoutPassword, token },
     });
   } catch (error) {
     next(error);
@@ -275,7 +324,7 @@ export const logout = async (req, res, next) => {
   try {
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { tokenValidAfter: new Date() }
+      data: { tokenValidAfter: new Date() },
     });
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
@@ -288,11 +337,18 @@ export const getMe = async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
-        id: true, name: true, email: true, role: true,
-        phone: true, avatar: true, isBlocked: true, isVerified: true, createdAt: true,
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        phone: true,
+        avatar: true,
+        isBlocked: true,
+        isVerified: true,
+        createdAt: true,
         evs: true,
-        station: { select: { id: true, name: true, status: true } }
-      }
+        station: { select: { id: true, name: true, status: true } },
+      },
     });
 
     res.json({ success: true, data: user });
@@ -306,13 +362,20 @@ export const changePassword = async (req, res, next) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Current password and new password are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Current password and new password are required' });
     }
     if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'New password must be at least 6 characters' });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: { id: true, password: true } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, password: true },
+    });
     const isMatch = await bcrypt.compare(currentPassword, user.password);
 
     if (!isMatch) {
@@ -322,7 +385,7 @@ export const changePassword = async (req, res, next) => {
     const hashed = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { password: hashed }
+      data: { password: hashed },
     });
 
     res.json({ success: true, message: 'Password updated successfully' });

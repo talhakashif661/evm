@@ -22,12 +22,14 @@ L.Icon.Default.mergeOptions({
 function FitBounds({ stations }) {
   const map = useMap();
   useEffect(() => {
-    const valid = stations.filter(s => typeof s.latitude === 'number' && typeof s.longitude === 'number');
+    const valid = stations.filter(
+      (s) => typeof s.latitude === 'number' && typeof s.longitude === 'number'
+    );
     if (valid.length === 0) return;
     if (valid.length === 1) {
       map.setView([valid[0].latitude, valid[0].longitude], 13);
     } else {
-      const bounds = L.latLngBounds(valid.map(s => [s.latitude, s.longitude]));
+      const bounds = L.latLngBounds(valid.map((s) => [s.latitude, s.longitude]));
       map.fitBounds(bounds, { padding: [40, 40] });
     }
   }, [stations, map]);
@@ -40,28 +42,41 @@ function FitBounds({ stations }) {
 // the whole map to reinitialize when the `stations` array itself hasn't
 // actually changed.
 function StationsMap({ stations }) {
-  const valid = stations.filter(s => typeof s.latitude === 'number' && typeof s.longitude === 'number');
+  const valid = stations.filter(
+    (s) => typeof s.latitude === 'number' && typeof s.longitude === 'number'
+  );
   const center = valid.length ? [valid[0].latitude, valid[0].longitude] : [30.3753, 69.3451]; // Pakistan-ish default
 
   return (
     <div className="ev-card" style={{ overflow: 'hidden', height: 520 }}>
-      <MapContainer center={center} zoom={6} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
+      <MapContainer
+        center={center}
+        zoom={6}
+        style={{ height: '100%', width: '100%' }}
+        scrollWheelZoom={true}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitBounds stations={valid} />
-        {valid.map(s => (
+        {valid.map((s) => (
           <Marker key={s.id} position={[s.latitude, s.longitude]}>
             <Popup>
               <div style={{ minWidth: 180 }}>
                 <p style={{ fontWeight: 700, marginBottom: 4 }}>{s.name}</p>
                 {s.ratingCount > 0 && (
-                  <div style={{ marginBottom: 4 }}><Stars value={s.ratingAvg} count={s.ratingCount} size={12} /></div>
+                  <div style={{ marginBottom: 4 }}>
+                    <Stars value={s.ratingAvg} count={s.ratingCount} size={12} />
+                  </div>
                 )}
-                <p style={{ fontSize: '0.82rem', color: '#555', marginBottom: 6 }}>{s.address}, {s.city}</p>
+                <p style={{ fontSize: '0.82rem', color: '#555', marginBottom: 6 }}>
+                  {s.address}, {s.city}
+                </p>
                 <p style={{ fontSize: '0.82rem', marginBottom: 8 }}>{toPKR(s.pricePerKwh)}/kWh</p>
-                <Link to={`/stations/${s.id}`} style={{ fontSize: '0.82rem', fontWeight: 600 }}>View details →</Link>
+                <Link to={`/stations/${s.id}`} style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                  View details →
+                </Link>
               </div>
             </Popup>
           </Marker>

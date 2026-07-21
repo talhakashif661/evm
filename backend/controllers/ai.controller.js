@@ -3,12 +3,14 @@ import prisma from '../utils/prisma.js';
 // Haversine formula for distance calculation
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; // Earth radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
@@ -26,22 +28,23 @@ const getDistance = (lat1, lon1, lat2, lon2) => {
 const calculateStationScore = (station, userLat, userLon, batteryLevel) => {
   const distance = getDistance(userLat, userLon, station.latitude, station.longitude);
 
-  const availableSlots = station.slots.filter(s => s.status === 'AVAILABLE').length;
+  const availableSlots = station.slots.filter((s) => s.status === 'AVAILABLE').length;
   const totalSlots = station.slots.length;
-  const queueLength = station.slots.filter(s => s.status === 'OCCUPIED' || s.status === 'RESERVED').length;
+  const queueLength = station.slots.filter(
+    (s) => s.status === 'OCCUPIED' || s.status === 'RESERVED'
+  ).length;
 
   // Normalize scores (0-100, higher = better)
-  const distanceScore = Math.max(0, 100 - (distance * 10)); // Penalty for each km
+  const distanceScore = Math.max(0, 100 - distance * 10); // Penalty for each km
   const priceScore = Math.max(0, 100 - station.pricePerKwh); // Lower price (Rs./kWh) = higher score
   const availabilityScore = totalSlots > 0 ? (availableSlots / totalSlots) * 100 : 0;
 
   // Battery urgency modifier (critical battery gets more weight on availability)
-  const batteryUrgency = batteryLevel <= 15 ? 3 : batteryLevel <= 30 ? 2 : batteryLevel <= 50 ? 1.5 : 1;
+  const batteryUrgency =
+    batteryLevel <= 15 ? 3 : batteryLevel <= 30 ? 2 : batteryLevel <= 50 ? 1.5 : 1;
 
   const baseScore =
-    (distanceScore * 0.30) +
-    (priceScore * 0.25) +
-    (availabilityScore * 0.25 * batteryUrgency);
+    distanceScore * 0.3 + priceScore * 0.25 + availabilityScore * 0.25 * batteryUrgency;
 
   // Urgency bonus: if battery is critical, boost nearby/available stations
   const urgencyBonus = batteryLevel <= 20 && availableSlots > 0 ? 20 : 0;
@@ -56,7 +59,7 @@ const calculateStationScore = (station, userLat, userLon, batteryLevel) => {
     estimatedWaitMinutes: queueLength * 30, // avg 30 min per charge
     distanceScore: parseFloat(distanceScore.toFixed(2)),
     priceScore: parseFloat(priceScore.toFixed(2)),
-    availabilityScore: parseFloat(availabilityScore.toFixed(2))
+    availabilityScore: parseFloat(availabilityScore.toFixed(2)),
   };
 };
 
@@ -65,7 +68,9 @@ export const getRecommendations = async (req, res, next) => {
     const { latitude, longitude, batteryLevel, limit = 5 } = req.query;
 
     if (!latitude || !longitude) {
-      return res.status(400).json({ success: false, message: 'Latitude and longitude are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Latitude and longitude are required' });
     }
 
     const userLat = parseFloat(latitude);
@@ -77,10 +82,10 @@ export const getRecommendations = async (req, res, next) => {
       where: { status: 'APPROVED' },
       include: {
         slots: {
-          select: { id: true, status: true, powerKw: true, auctionOpen: true }
+          select: { id: true, status: true, powerKw: true, auctionOpen: true },
         },
-        owner: { select: { name: true, phone: true } }
-      }
+        owner: { select: { name: true, phone: true } },
+      },
     });
 
     if (!stations.length) {
@@ -88,12 +93,12 @@ export const getRecommendations = async (req, res, next) => {
     }
 
     // Score each station
-    const scored = stations.map(station => {
+    const scored = stations.map((station) => {
       const metrics = calculateStationScore(station, userLat, userLon, battery);
       return {
         ...station,
         aiMetrics: metrics,
-        recommendation: getRecommendationLabel(metrics.score, battery, metrics.availableSlots)
+        recommendation: getRecommendationLabel(metrics.score, battery, metrics.availableSlots),
       };
     });
 
@@ -115,8 +120,8 @@ export const getRecommendations = async (req, res, next) => {
         batteryLevel: battery,
         userLocation: { lat: userLat, lon: userLon },
         totalStationsAnalyzed: stations.length,
-        isEmergency: battery <= 20
-      }
+        isEmergency: battery <= 20,
+      },
     });
   } catch (error) {
     next(error);
@@ -147,4 +152,3 @@ const generateExplanation = (station, batteryLevel) => {
 
   return `Best choice because: ${parts.join(', ')}.`;
 };
-

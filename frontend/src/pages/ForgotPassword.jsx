@@ -24,17 +24,51 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-      background: 'var(--bg-page)' }}>
-      <SEO title="Forgot Password" description="Reset your ChargeEV account password securely via email." noIndex />
-      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} style={{ width: '100%', maxWidth: 420 }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        background: 'var(--bg-page)',
+      }}
+    >
+      <SEO
+        title="Forgot Password"
+        description="Reset your ChargeEV account password securely via email."
+        noIndex
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ width: '100%', maxWidth: 420 }}
+      >
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 60, height: 60, borderRadius: 16, background: 'var(--primary-glow)',
-            border: '1px solid var(--border-hover)', marginBottom: 16 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 60,
+              height: 60,
+              borderRadius: 16,
+              background: 'var(--primary-glow)',
+              border: '1px solid var(--border-hover)',
+              marginBottom: 16,
+            }}
+          >
             <MailCheck size={26} color="var(--primary)" />
           </div>
-          <h1 style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '2.3rem', fontWeight: 700, letterSpacing: '0.02em', marginBottom: 8 }}>
+          <h1
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: '2.3rem',
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              marginBottom: 8,
+            }}
+          >
             Reset Your <span style={{ color: 'var(--primary)' }}>Password</span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
@@ -55,18 +89,40 @@ export default function ForgotPassword() {
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label className="form-label" htmlFor="forgot-email">Email Address</label>
-                <input id="forgot-email" type="email" className="form-control" placeholder="you@example.com"
-                  value={email} onChange={e => setEmail(e.target.value)} required />
+                <label className="form-label" htmlFor="forgot-email">
+                  Email Address
+                </label>
+                <input
+                  id="forgot-email"
+                  type="email"
+                  className="form-control"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
-              <button type="submit" className="btn-gold w-100" style={{ padding: '13px', fontSize: '1rem' }} disabled={loading}>
+              <button
+                type="submit"
+                className="btn-gold w-100"
+                style={{ padding: '13px', fontSize: '1rem' }}
+                disabled={loading}
+              >
                 {loading ? 'Sending...' : 'Send Reset Link'}
               </button>
             </form>
           )}
 
           <div style={{ marginTop: 20, textAlign: 'center' }}>
-            <Link to="/login" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600, fontSize: '0.88rem' }}>
+            <Link
+              to="/login"
+              style={{
+                color: 'var(--primary)',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+              }}
+            >
               Back to Sign In
             </Link>
           </div>

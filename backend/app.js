@@ -60,7 +60,10 @@ const loginLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many login attempts. Please wait 15 minutes and try again.' }
+  message: {
+    success: false,
+    message: 'Too many login attempts. Please wait 15 minutes and try again.',
+  },
 });
 
 // Strict limiter for registration - prevent mass account creation
@@ -69,7 +72,10 @@ const registerLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many registration attempts. Please try again in an hour.' }
+  message: {
+    success: false,
+    message: 'Too many registration attempts. Please try again in an hour.',
+  },
 });
 
 // Forgot-password - prevent email-bombing an inbox
@@ -78,7 +84,7 @@ const forgotPasswordLimiter = rateLimit({
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many password reset requests. Please wait 15 minutes.' }
+  message: { success: false, message: 'Too many password reset requests. Please wait 15 minutes.' },
 });
 
 // Admin bootstrap - this was the only sensitive auth route with no limiter,
@@ -88,7 +94,10 @@ const setupAdminLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many admin setup attempts. Please wait 15 minutes and try again.' }
+  message: {
+    success: false,
+    message: 'Too many admin setup attempts. Please wait 15 minutes and try again.',
+  },
 });
 
 // Complaints allow GUEST (unauthenticated) submission by design, which makes
@@ -101,7 +110,10 @@ const complaintLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many submissions. Please wait a while before trying again.' }
+  message: {
+    success: false,
+    message: 'Too many submissions. Please wait a while before trying again.',
+  },
 });
 
 // Baseline ceiling for every other /api route (booking/bid/payment-intent
@@ -113,14 +125,19 @@ const apiLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' }
+  message: {
+    success: false,
+    message: 'Too many requests. Please slow down and try again shortly.',
+  },
 });
 
 // Middleware
-app.use(cors({
-  origin: getAllowedOrigins(),
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: getAllowedOrigins(),
+    credentials: true,
+  })
+);
 
 // Stripe webhook signature verification needs the raw request body, which is
 // gone once express.json() below has parsed it — so this one route is
@@ -176,19 +193,25 @@ app.get('/sitemap.xml', async (req, res, next) => {
 
     const urls = [...staticUrls, ...stationUrls];
     const body = urls
-      .map((u) => [
-        '  <url>',
-        `    <loc>${base}${u.loc}</loc>`,
-        u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>` : null,
-        `    <changefreq>${u.changefreq}</changefreq>`,
-        `    <priority>${u.priority}</priority>`,
-        '  </url>',
-      ].filter(Boolean).join('\n'))
+      .map((u) =>
+        [
+          '  <url>',
+          `    <loc>${base}${u.loc}</loc>`,
+          u.lastmod ? `    <lastmod>${u.lastmod}</lastmod>` : null,
+          `    <changefreq>${u.changefreq}</changefreq>`,
+          `    <priority>${u.priority}</priority>`,
+          '  </url>',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      )
       .join('\n');
 
-    res.type('application/xml').send(
-      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>`
-    );
+    res
+      .type('application/xml')
+      .send(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>`
+      );
   } catch (error) {
     next(error);
   }

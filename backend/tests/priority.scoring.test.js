@@ -32,8 +32,8 @@ describe('calculatePriority — weighting', () => {
   });
 
   it('gives critical batteries (<=20%) the strongest urgency boost', () => {
-    const criticalTiny = calculatePriority(20, 15);    // near-zero bid, critical battery
-    const healthyHuge = calculatePriority(1200, 90);   // large bid, healthy battery
+    const criticalTiny = calculatePriority(20, 15); // near-zero bid, critical battery
+    const healthyHuge = calculatePriority(1200, 90); // large bid, healthy battery
     // Urgency alone contributes 0.4*100 = 40 for a critical battery, so even a
     // tiny bid stays competitive against a big bid from a full battery.
     expect(criticalTiny).toBeGreaterThan(35);
@@ -48,10 +48,9 @@ describe('calculatePriority — order independence', () => {
       { id: 'B', amount: 2000, battery: 70 },
       { id: 'C', amount: 400, battery: 45 },
       { id: 'D', amount: 1100, battery: 22 },
-    ].map(b => ({ ...b, priority: calculatePriority(b.amount, b.battery) }));
+    ].map((b) => ({ ...b, priority: calculatePriority(b.amount, b.battery) }));
 
-    const rankOf = (arr) =>
-      [...arr].sort((x, y) => y.priority - x.priority).map(b => b.id);
+    const rankOf = (arr) => [...arr].sort((x, y) => y.priority - x.priority).map((b) => b.id);
 
     const order1 = rankOf(bids);
     const order2 = rankOf([...bids].reverse());

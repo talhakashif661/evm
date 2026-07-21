@@ -48,14 +48,17 @@ export const deleteEV = createAsyncThunk('ev/delete', async (id, { rejectWithVal
   }
 });
 
-export const updateBattery = createAsyncThunk('ev/updateBattery', async ({ id, batteryPercentage }, { rejectWithValue }) => {
-  try {
-    const res = await api.patch(`/evs/${id}/battery`, { batteryPercentage });
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const updateBattery = createAsyncThunk(
+  'ev/updateBattery',
+  async ({ id, batteryPercentage }, { rejectWithValue }) => {
+    try {
+      const res = await api.patch(`/evs/${id}/battery`, { batteryPercentage });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
 const evSlice = createSlice({
   name: 'ev',
@@ -63,7 +66,9 @@ const evSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchMyEVs.pending, (state) => { state.loading = true; })
+      .addCase(fetchMyEVs.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(fetchMyEVs.fulfilled, (state, action) => {
         state.loading = false;
         state.evs = action.payload.data;
@@ -80,23 +85,23 @@ const evSlice = createSlice({
       })
       .addCase(addEV.rejected, (_, action) => toast.error(action.payload))
       .addCase(updateEV.fulfilled, (state, action) => {
-        const idx = state.evs.findIndex(e => e.id === action.payload.data.id);
+        const idx = state.evs.findIndex((e) => e.id === action.payload.data.id);
         if (idx !== -1) state.evs[idx] = action.payload.data;
         toast.success('EV updated!');
       })
       .addCase(updateEV.rejected, (_, action) => toast.error(action.payload))
       .addCase(deleteEV.fulfilled, (state, action) => {
-        state.evs = state.evs.filter(e => e.id !== action.payload);
+        state.evs = state.evs.filter((e) => e.id !== action.payload);
         toast.success('EV removed');
       })
       .addCase(deleteEV.rejected, (_, action) => toast.error(action.payload))
       .addCase(updateBattery.fulfilled, (state, action) => {
-        const idx = state.evs.findIndex(e => e.id === action.payload.data.id);
+        const idx = state.evs.findIndex((e) => e.id === action.payload.data.id);
         if (idx !== -1) state.evs[idx] = action.payload.data;
         toast.success('Battery level updated!');
       })
       .addCase(updateBattery.rejected, (_, action) => toast.error(action.payload));
-  }
+  },
 });
 
 export default evSlice.reducer;

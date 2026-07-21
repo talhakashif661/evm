@@ -1,5 +1,11 @@
 import express from 'express';
-import { addEV, getMyEVs, updateEV, deleteEV, updateBatteryLevel } from '../controllers/ev.controller.js';
+import {
+  addEV,
+  getMyEVs,
+  updateEV,
+  deleteEV,
+  updateBatteryLevel,
+} from '../controllers/ev.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();

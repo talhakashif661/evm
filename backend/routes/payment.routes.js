@@ -14,7 +14,11 @@ import logger from '../utils/logger.js';
 export const stripeWebhook = async (req, res) => {
   let event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      req.headers['stripe-signature'],
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
   } catch (err) {
     logger.error('Stripe webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -29,12 +33,19 @@ export const stripeWebhook = async (req, res) => {
       // activateBookingPayment is itself scoped to CHECKED_IN bookings with no
       // existing Payment row, so a booking that's already ACTIVE/COMPLETED/
       // CANCELLED, or a retried/out-of-order webhook delivery, is a safe no-op.
-      await activateBookingPayment({ bookingId, method: 'STRIPE', stripePaymentIntentId: intent.id });
+      await activateBookingPayment({
+        bookingId,
+        method: 'STRIPE',
+        stripePaymentIntentId: intent.id,
+      });
     } else if (event.type === 'payment_intent.payment_failed') {
       const intent = event.data.object;
       const bookingId = intent.metadata?.bookingId;
       if (bookingId) {
-        const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { userId: true } });
+        const booking = await prisma.booking.findUnique({
+          where: { id: bookingId },
+          select: { userId: true },
+        });
         // Booking stays CHECKED_IN — the user can retry within the remaining
         // grace period (expirePaymentTimeouts will cancel it if they don't).
         if (booking) getIO()?.to(`user:${booking.userId}`).emit('payment:failed', { bookingId });
@@ -69,13 +80,15 @@ router.get('/history', async (req, res, next) => {
       where: { userId: req.user.id },
       include: {
         booking: {
-          include: { slot: { include: { station: { select: { name: true } } } } }
-        }
+          include: { slot: { include: { station: { select: { name: true } } } } },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, data: payments });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // transactionId here is stripePaymentIntentId — either a real Stripe
@@ -87,12 +100,14 @@ router.get('/status/:transactionId', async (req, res, next) => {
     const payment = await prisma.payment.findFirst({
       where: {
         stripePaymentIntentId: req.params.transactionId,
-        ...(req.user.role === 'ADMIN' ? {} : { userId: req.user.id })
-      }
+        ...(req.user.role === 'ADMIN' ? {} : { userId: req.user.id }),
+      },
     });
     if (!payment) return res.status(404).json({ success: false, message: 'Payment not found' });
     res.json({ success: true, data: payment });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default router;

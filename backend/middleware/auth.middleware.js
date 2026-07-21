@@ -18,13 +18,22 @@ export const authenticate = async (req, res, next) => {
       // this query already ran on every request) to support real logout:
       // POST /api/auth/logout sets it to now(), and any token whose iat
       // predates it is rejected below even though its signature still verifies.
-      select: { id: true, email: true, role: true, isBlocked: true, isVerified: true, tokenValidAfter: true }
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isBlocked: true,
+        isVerified: true,
+        tokenValidAfter: true,
+      },
     });
 
     if (!user) return res.status(401).json({ success: false, message: 'User not found' });
     if (user.isBlocked) return res.status(403).json({ success: false, message: 'Account blocked' });
     if (user.tokenValidAfter && decoded.iat * 1000 < user.tokenValidAfter.getTime()) {
-      return res.status(401).json({ success: false, message: 'Session expired. Please log in again.' });
+      return res
+        .status(401)
+        .json({ success: false, message: 'Session expired. Please log in again.' });
     }
 
     req.user = user;
@@ -42,7 +51,9 @@ export const authenticate = async (req, res, next) => {
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Access denied: insufficient permissions' });
+      return res
+        .status(403)
+        .json({ success: false, message: 'Access denied: insufficient permissions' });
     }
     next();
   };

@@ -13,7 +13,11 @@ export function dataUrlByteLength(dataUrl) {
   return Math.floor((base64.length * 3) / 4);
 }
 
-export async function compressImageToUnder(file, maxBytes, { startSide = 256, startQuality = 0.85 } = {}) {
+export async function compressImageToUnder(
+  file,
+  maxBytes,
+  { startSide = 256, startQuality = 0.85 } = {}
+) {
   const imageBitmap = await createImageBitmap(file);
   let side = startSide;
   let quality = startQuality;
@@ -35,5 +39,7 @@ export async function compressImageToUnder(file, maxBytes, { startSide = 256, st
     else quality = Math.max(0.4, quality - 0.15);
   }
 
-  throw new Error(`Could not compress image under ${Math.round(maxBytes / 1024)}KB. Try a simpler/smaller photo.`);
+  throw new Error(
+    `Could not compress image under ${Math.round(maxBytes / 1024)}KB. Try a simpler/smaller photo.`
+  );
 }

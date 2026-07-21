@@ -24,7 +24,11 @@ export function escapeHtml(value) {
 // only if a flag is true. Wrapping those specific literals in raw(...)
 // marks them as already-safe, so the tag function passes them through
 // instead of escaping our own markup into visible text.
-class SafeHtml { constructor(value) { this.value = value; } }
+class SafeHtml {
+  constructor(value) {
+    this.value = value;
+  }
+}
 export const raw = (value) => new SafeHtml(value);
 
 export function html(strings, ...values) {

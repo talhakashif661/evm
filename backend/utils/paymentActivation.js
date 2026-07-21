@@ -15,7 +15,7 @@ import { audit } from './audit.js';
 export const activateBookingPayment = async ({ bookingId, method, stripePaymentIntentId }) => {
   const booking = await prisma.booking.findFirst({
     where: { id: bookingId, status: 'CHECKED_IN' },
-    include: { slot: { select: { stationId: true } } }
+    include: { slot: { select: { stationId: true } } },
   });
   if (!booking) return null;
 
@@ -29,19 +29,27 @@ export const activateBookingPayment = async ({ bookingId, method, stripePaymentI
       amount: booking.totalCost,
       status: 'COMPLETED',
       method,
-      stripePaymentIntentId
-    }
+      stripePaymentIntentId,
+    },
   });
   await prisma.booking.update({ where: { id: bookingId }, data: { status: 'ACTIVE' } });
   await prisma.chargingStation.update({
     where: { id: booking.slot.stationId },
-    data: { totalRevenue: { increment: booking.totalCost } }
+    data: { totalRevenue: { increment: booking.totalCost } },
   });
 
   getIO()?.to(`user:${booking.userId}`).emit('payment:confirmed', { bookingId });
-  getIO()?.to(`user:${booking.userId}`).emit('booking:status-changed', { bookingId, status: 'ACTIVE' });
-  getIO()?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', { slotId: booking.slotId });
-  audit({ user: { id: booking.userId }, ip: null }, 'PAYMENT_COMPLETED', `${method} payment ${stripePaymentIntentId} for booking ${bookingId}`);
+  getIO()
+    ?.to(`user:${booking.userId}`)
+    .emit('booking:status-changed', { bookingId, status: 'ACTIVE' });
+  getIO()
+    ?.to(`slot:${booking.slotId}`)
+    .emit('slot:availability-changed', { slotId: booking.slotId });
+  audit(
+    { user: { id: booking.userId }, ip: null },
+    'PAYMENT_COMPLETED',
+    `${method} payment ${stripePaymentIntentId} for booking ${bookingId}`
+  );
 
   return payment;
 };

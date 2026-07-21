@@ -3,6 +3,7 @@ import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
+import eslintConfigPrettier from 'eslint-config-prettier'
 
 // Standard Vite + React setup (matches what `npm create vite -- --template
 // react` scaffolds by default) — flat config, since that's the default as
@@ -56,4 +57,7 @@ export default [
     },
     settings: { react: { version: 'detect' } },
   },
+  // Must be last: turns off any ESLint stylistic rules that would otherwise
+  // conflict with Prettier's own formatting (added in Phase 8.2 Prettier setup).
+  eslintConfigPrettier,
 ]

@@ -23,14 +23,14 @@ export const validateQuery = (fieldRules = {}) => {
       if (typeof value !== 'string') {
         return res.status(400).json({
           success: false,
-          message: `Invalid query parameter "${field}": must be a plain string value`
+          message: `Invalid query parameter "${field}": must be a plain string value`,
         });
       }
 
       if (Array.isArray(allowedValues) && !allowedValues.includes(value)) {
         return res.status(400).json({
           success: false,
-          message: `Invalid query parameter "${field}": must be one of [${allowedValues.join(', ')}]`
+          message: `Invalid query parameter "${field}": must be one of [${allowedValues.join(', ')}]`,
         });
       }
     }

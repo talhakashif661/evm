@@ -40,7 +40,9 @@ export const fetchMe = createAsyncThunk('auth/fetchMe', async (_, { rejectWithVa
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
   try {
     await api.post('/auth/logout');
-  } catch { /* best-effort — local session clears regardless, see below */ }
+  } catch {
+    /* best-effort — local session clears regardless, see below */
+  }
   return true;
 });
 
@@ -51,10 +53,12 @@ const authSlice = createSlice({
     token: storedToken || null,
     loading: false,
     error: null,
-    initialized: false
+    initialized: false,
   },
   reducers: {
-    clearError: (state) => { state.error = null; },
+    clearError: (state) => {
+      state.error = null;
+    },
     // Called after successful OTP verification so the banner disappears immediately
     // without waiting for the next fetchMe() cycle.
     setUserVerified: (state) => {
@@ -71,12 +75,15 @@ const authSlice = createSlice({
         state.user = { ...state.user, ...action.payload };
         localStorage.setItem('ev_user', JSON.stringify(state.user));
       }
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
       // Register
-      .addCase(registerUser.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(registerUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.data.user;
@@ -92,7 +99,10 @@ const authSlice = createSlice({
         toast.error(action.payload);
       })
       // Login
-      .addCase(loginUser.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(loginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload.data.user;
@@ -113,7 +123,9 @@ const authSlice = createSlice({
         state.initialized = true;
         localStorage.setItem('ev_user', JSON.stringify(action.payload.data));
       })
-      .addCase(fetchMe.rejected, (state) => { state.initialized = true; })
+      .addCase(fetchMe.rejected, (state) => {
+        state.initialized = true;
+      })
       // Logout
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
@@ -123,7 +135,7 @@ const authSlice = createSlice({
         reauthSocket();
         toast.info('Logged out');
       });
-  }
+  },
 });
 
 export const { clearError, setUserVerified, updateUser } = authSlice.actions;

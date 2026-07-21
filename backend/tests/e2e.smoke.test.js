@@ -49,18 +49,19 @@ function fakeSucceededWebhook(bookingId, intentId) {
   const payloadString = JSON.stringify({
     id: `evt_test_${intentId}`,
     type: 'payment_intent.succeeded',
-    data: { object: { id: intentId, metadata: { bookingId } } }
+    data: { object: { id: intentId, metadata: { bookingId } } },
   });
   const signature = stripe.webhooks.generateTestHeaderString({
     payload: payloadString,
     secret: process.env.STRIPE_WEBHOOK_SECRET,
-    timestamp: Math.floor(Date.now() / 1000)
+    timestamp: Math.floor(Date.now() / 1000),
   });
   return { payloadString, signature };
 }
 
 async function postWebhook(payloadString, signature) {
-  return api().post('/api/payments/webhook')
+  return api()
+    .post('/api/payments/webhook')
     .set('Content-Type', 'application/json')
     .set('stripe-signature', signature)
     .send(payloadString);
@@ -71,14 +72,16 @@ let stationId, slot1Id, slot2Id, evId, ev2Id, booking1Id, auctionBookingId;
 
 describe('E2E: admin bootstrap via POST /api/auth/setup-admin', () => {
   it('refuses the wrong key', async () => {
-    const res = await api().post('/api/auth/setup-admin')
+    const res = await api()
+      .post('/api/auth/setup-admin')
       .set('x-setup-key', 'wrong')
       .send({ name: 'Root', email: 'admin@chargeev.pk', password: 'admin123' });
     expect(res.status).toBe(403);
   });
 
   it('creates the first admin with the correct key', async () => {
-    const res = await api().post('/api/auth/setup-admin')
+    const res = await api()
+      .post('/api/auth/setup-admin')
       .set('x-setup-key', 'e2e-setup-key')
       .send({ name: 'Root Admin', email: 'admin@chargeev.pk', password: 'admin123' });
     expect(res.status).toBe(201);
@@ -88,7 +91,8 @@ describe('E2E: admin bootstrap via POST /api/auth/setup-admin', () => {
   });
 
   it('refuses to run a second time once an admin exists', async () => {
-    const res = await api().post('/api/auth/setup-admin')
+    const res = await api()
+      .post('/api/auth/setup-admin')
       .set('x-setup-key', 'e2e-setup-key')
       .send({ name: 'Evil Twin', email: 'admin2@chargeev.pk', password: 'admin123' });
     expect(res.status).toBe(409);
@@ -97,24 +101,28 @@ describe('E2E: admin bootstrap via POST /api/auth/setup-admin', () => {
 
 describe('E2E: registration + login for every role', () => {
   it('registers an EV user and a station owner', async () => {
-    const r1 = await api().post('/api/auth/register')
+    const r1 = await api()
+      .post('/api/auth/register')
       .send({ name: 'Eva Driver', email: 'eva@x.pk', password: 'secret1', role: 'EV_USER' });
     expect(r1.status).toBe(201);
     evToken = r1.body.data.token;
 
-    const r2 = await api().post('/api/auth/register')
+    const r2 = await api()
+      .post('/api/auth/register')
       .send({ name: 'Omar Owner', email: 'omar@x.pk', password: 'secret1', role: 'STATION_OWNER' });
     expect(r2.status).toBe(201);
     ownerToken = r2.body.data.token;
 
-    const r3 = await api().post('/api/auth/register')
+    const r3 = await api()
+      .post('/api/auth/register')
       .send({ name: 'Zed Second', email: 'zed@x.pk', password: 'secret1', role: 'EV_USER' });
     expect(r3.status).toBe(201);
     ev2Token = r3.body.data.token;
   });
 
   it('rejects registering directly as ADMIN', async () => {
-    const res = await api().post('/api/auth/register')
+    const res = await api()
+      .post('/api/auth/register')
       .send({ name: 'Sneaky', email: 'sneak@x.pk', password: 'secret1', role: 'ADMIN' });
     expect(res.status).toBe(400);
   });
@@ -128,9 +136,11 @@ describe('E2E: registration + login for every role', () => {
     // Plant internal secrets on the row; the login response must not echo them.
     await mockPrisma.user.update({
       where: { email: 'eva@x.pk' },
-      data: { verificationOtpHash: 'deadbeef', resetTokenHash: 'cafebabe' }
+      data: { verificationOtpHash: 'deadbeef', resetTokenHash: 'cafebabe' },
     });
-    const res = await api().post('/api/auth/login').send({ email: 'eva@x.pk', password: 'secret1' });
+    const res = await api()
+      .post('/api/auth/login')
+      .send({ email: 'eva@x.pk', password: 'secret1' });
     expect(res.status).toBe(200);
     expect(res.body.data.user.role).toBe('EV_USER');
     expect(res.body.data.user).not.toHaveProperty('password');
@@ -141,7 +151,9 @@ describe('E2E: registration + login for every role', () => {
   });
 
   it('logs in the admin (the account created via Postman-style POST)', async () => {
-    const res = await api().post('/api/auth/login').send({ email: 'admin@chargeev.pk', password: 'admin123' });
+    const res = await api()
+      .post('/api/auth/login')
+      .send({ email: 'admin@chargeev.pk', password: 'admin123' });
     expect(res.status).toBe(200);
     expect(res.body.data.user.role).toBe('ADMIN');
     adminToken = res.body.data.token;
@@ -154,15 +166,23 @@ describe('E2E: role guards', () => {
     expect(res.status).toBe(403);
   });
   it('station owner cannot manage EVs (EV_USER-only routes)', async () => {
-    const res = await api().post('/api/evs').set(auth(ownerToken)).send({ model: 'X', batteryCapacity: 50 });
+    const res = await api()
+      .post('/api/evs')
+      .set(auth(ownerToken))
+      .send({ model: 'X', batteryCapacity: 50 });
     expect(res.status).toBe(403);
   });
   it('EV user cannot add slots (STATION_OWNER-only routes)', async () => {
-    const res = await api().post('/api/slots').set(auth(evToken)).send({ slotNumber: 1, powerKw: 22 });
+    const res = await api()
+      .post('/api/slots')
+      .set(auth(evToken))
+      .send({ slotNumber: 1, powerKw: 22 });
     expect(res.status).toBe(403);
   });
   it('unverified users are blocked from booking (KYC gate)', async () => {
-    const res = await api().post('/api/bookings').set(auth(evToken))
+    const res = await api()
+      .post('/api/bookings')
+      .set(auth(evToken))
       .send({ slotId: '0'.repeat(24), evId: '0'.repeat(24), startTime: new Date().toISOString() });
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('EMAIL_NOT_VERIFIED');
@@ -176,8 +196,12 @@ describe('E2E: station lifecycle (owner creates → admin approves)', () => {
       await mockPrisma.user.update({ where: { email }, data: { isVerified: true } });
     }
     const res = await api().post('/api/stations').set(auth(ownerToken)).send({
-      name: 'GreenVolt Gulberg', address: '12 Main Blvd', city: 'Lahore',
-      latitude: 31.5204, longitude: 74.3587, pricePerKwh: 0.18
+      name: 'GreenVolt Gulberg',
+      address: '12 Main Blvd',
+      city: 'Lahore',
+      latitude: 31.5204,
+      longitude: 74.3587,
+      pricePerKwh: 0.18,
     });
     expect(res.status).toBe(201);
     expect(res.body.data.status).toBe('PENDING');
@@ -185,22 +209,33 @@ describe('E2E: station lifecycle (owner creates → admin approves)', () => {
   });
 
   it('owner cannot add slots before approval', async () => {
-    const res = await api().post('/api/slots').set(auth(ownerToken)).send({ slotNumber: 1, powerKw: 22 });
+    const res = await api()
+      .post('/api/slots')
+      .set(auth(ownerToken))
+      .send({ slotNumber: 1, powerKw: 22 });
     expect(res.status).toBe(400);
   });
 
   it('admin approves the station (and it is audited)', async () => {
-    const res = await api().patch(`/api/admin/stations/${stationId}/status`)
-      .set(auth(adminToken)).send({ action: 'APPROVED' });
+    const res = await api()
+      .patch(`/api/admin/stations/${stationId}/status`)
+      .set(auth(adminToken))
+      .send({ action: 'APPROVED' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('APPROVED');
   });
 
   it('owner adds two slots after approval', async () => {
-    const s1 = await api().post('/api/slots').set(auth(ownerToken)).send({ slotNumber: 1, powerKw: 22 });
+    const s1 = await api()
+      .post('/api/slots')
+      .set(auth(ownerToken))
+      .send({ slotNumber: 1, powerKw: 22 });
     expect(s1.status).toBe(201);
     slot1Id = s1.body.data.id;
-    const s2 = await api().post('/api/slots').set(auth(ownerToken)).send({ slotNumber: 2, powerKw: 50 });
+    const s2 = await api()
+      .post('/api/slots')
+      .set(auth(ownerToken))
+      .send({ slotNumber: 2, powerKw: 50 });
     expect(s2.status).toBe(201);
     slot2Id = s2.body.data.id;
   });
@@ -208,24 +243,32 @@ describe('E2E: station lifecycle (owner creates → admin approves)', () => {
 
 describe('E2E: time-window bookings + overlap detection', () => {
   it('EV users register their EVs', async () => {
-    const r1 = await api().post('/api/evs').set(auth(evToken))
+    const r1 = await api()
+      .post('/api/evs')
+      .set(auth(evToken))
       .send({ model: 'Nissan Leaf', batteryCapacity: 40, batteryPercentage: 35 });
     expect(r1.status).toBe(201);
     evId = r1.body.data.id;
-    const r2 = await api().post('/api/evs').set(auth(ev2Token))
+    const r2 = await api()
+      .post('/api/evs')
+      .set(auth(ev2Token))
       .send({ model: 'MG ZS EV', batteryCapacity: 50, batteryPercentage: 60 });
     expect(r2.status).toBe(201);
     ev2Id = r2.body.data.id;
   });
 
   it('rejects garbage battery capacity on EV creation (NaN regression test)', async () => {
-    const res = await api().post('/api/evs').set(auth(evToken))
+    const res = await api()
+      .post('/api/evs')
+      .set(auth(evToken))
       .send({ model: 'Junk', batteryCapacity: 'abc' });
     expect(res.status).toBe(400);
   });
 
   it('books slot 1 for a 60-minute window starting now', async () => {
-    const res = await api().post('/api/bookings').set(auth(evToken))
+    const res = await api()
+      .post('/api/bookings')
+      .set(auth(evToken))
       .send({ slotId: slot1Id, evId, startTime: new Date().toISOString(), durationMinutes: 60 });
     expect(res.status).toBe(201);
     expect(res.body.data.plannedEndTime).toBeTruthy();
@@ -237,7 +280,9 @@ describe('E2E: time-window bookings + overlap detection', () => {
 
   it('REJECTS an overlapping window on the same slot (the new conflict check)', async () => {
     const inThirty = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-    const res = await api().post('/api/bookings').set(auth(ev2Token))
+    const res = await api()
+      .post('/api/bookings')
+      .set(auth(ev2Token))
       .send({ slotId: slot1Id, evId: ev2Id, startTime: inThirty, durationMinutes: 60 });
     expect(res.status).toBe(409);
     expect(res.body.message).toMatch(/already booked/i);
@@ -245,7 +290,9 @@ describe('E2E: time-window bookings + overlap detection', () => {
 
   it('ACCEPTS a non-overlapping later window on the same slot (multi-window booking)', async () => {
     const inTwoHours = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-    const res = await api().post('/api/bookings').set(auth(ev2Token))
+    const res = await api()
+      .post('/api/bookings')
+      .set(auth(ev2Token))
       .send({ slotId: slot1Id, evId: ev2Id, startTime: inTwoHours, durationMinutes: 60 });
     expect(res.status).toBe(201);
   });
@@ -260,26 +307,45 @@ describe('E2E: time-window bookings + overlap detection', () => {
   it('two truly simultaneous requests for the SAME window on a slot — exactly one wins, not zero or two', async () => {
     const start = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(); // clear of slot2's other bookings
     const [resA, resB] = await Promise.all([
-      api().post('/api/bookings').set(auth(evToken)).send({ slotId: slot2Id, evId, startTime: start, durationMinutes: 60 }),
-      api().post('/api/bookings').set(auth(ev2Token)).send({ slotId: slot2Id, evId: ev2Id, startTime: start, durationMinutes: 60 }),
+      api()
+        .post('/api/bookings')
+        .set(auth(evToken))
+        .send({ slotId: slot2Id, evId, startTime: start, durationMinutes: 60 }),
+      api()
+        .post('/api/bookings')
+        .set(auth(ev2Token))
+        .send({ slotId: slot2Id, evId: ev2Id, startTime: start, durationMinutes: 60 }),
     ]);
 
     const statuses = [resA.status, resB.status].sort();
     expect(statuses).toEqual([201, 409]); // exactly one succeeds, the other is rejected — never both, never neither
 
     const survivors = await mockPrisma.booking.findMany({
-      where: { slotId: slot2Id, startTime: new Date(start), status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'ACTIVE'] } }
+      where: {
+        slotId: slot2Id,
+        startTime: new Date(start),
+        status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'ACTIVE'] },
+      },
     });
     expect(survivors.length).toBe(1); // the database itself has exactly one live booking for this window
   });
 
   it('rejects a start time in the past and an out-of-range duration', async () => {
     const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const r1 = await api().post('/api/bookings').set(auth(ev2Token))
+    const r1 = await api()
+      .post('/api/bookings')
+      .set(auth(ev2Token))
       .send({ slotId: slot2Id, evId: ev2Id, startTime: past, durationMinutes: 60 });
     expect(r1.status).toBe(400);
-    const r2 = await api().post('/api/bookings').set(auth(ev2Token))
-      .send({ slotId: slot2Id, evId: ev2Id, startTime: new Date().toISOString(), durationMinutes: 5 });
+    const r2 = await api()
+      .post('/api/bookings')
+      .set(auth(ev2Token))
+      .send({
+        slotId: slot2Id,
+        evId: ev2Id,
+        startTime: new Date().toISOString(),
+        durationMinutes: 5,
+      });
     expect(r2.status).toBe(400);
   });
 });
@@ -337,24 +403,32 @@ describe('E2E: check-in locks cost, webhook pays exactly once, then completion',
 
 describe('E2E: auction flow', () => {
   it('owner opens an auction on slot 2 (duration validated)', async () => {
-    const bad = await api().post(`/api/slots/${slot2Id}/auction/open`).set(auth(ownerToken))
+    const bad = await api()
+      .post(`/api/slots/${slot2Id}/auction/open`)
+      .set(auth(ownerToken))
       .send({ durationMinutes: 99999 });
     expect(bad.status).toBe(400);
 
-    const res = await api().post(`/api/slots/${slot2Id}/auction/open`).set(auth(ownerToken))
+    const res = await api()
+      .post(`/api/slots/${slot2Id}/auction/open`)
+      .set(auth(ownerToken))
       .send({ durationMinutes: 30 });
     expect(res.status).toBe(200);
     expect(res.body.data.auctionOpen).toBe(true);
   });
 
   it('the owner CANNOT bid on their own slot (new guard)', async () => {
-    const res = await api().post('/api/bids').set(auth(ownerToken))
+    const res = await api()
+      .post('/api/bids')
+      .set(auth(ownerToken))
       .send({ slotId: slot2Id, amount: 10, batteryLevel: 50 });
     expect(res.status).toBe(403);
   });
 
   it('an EV user bids; priority = 60% bid + 40% urgency against the fixed ceiling', async () => {
-    const res = await api().post('/api/bids').set(auth(evToken))
+    const res = await api()
+      .post('/api/bids')
+      .set(auth(evToken))
       .send({ slotId: slot2Id, amount: 1000, batteryLevel: 15 });
     expect(res.status).toBe(201);
     // 1000/2000 × 0.6 + 1.0 × 0.4 = 0.7 → 70
@@ -388,13 +462,17 @@ describe('E2E: auction flow', () => {
   });
 
   it('the owner completes the auction booking; the customer pays exactly their bid, not a recomputed usage figure', async () => {
-    const res = await api().patch(`/api/bookings/${auctionBookingId}/complete`).set(auth(ownerToken));
+    const res = await api()
+      .patch(`/api/bookings/${auctionBookingId}/complete`)
+      .set(auth(ownerToken));
     expect(res.status).toBe(200);
     expect(res.body.data.totalCost).toBe(1000);
   });
 
   it('bids on the now-closed auction are rejected', async () => {
-    const res = await api().post('/api/bids').set(auth(ev2Token))
+    const res = await api()
+      .post('/api/bids')
+      .set(auth(ev2Token))
       .send({ slotId: slot2Id, amount: 60, batteryLevel: 40 });
     expect(res.status).toBe(400);
   });
@@ -404,9 +482,9 @@ describe('E2E: admin dashboard + audit trail', () => {
   it('dashboard stats aggregate correctly', async () => {
     const res = await api().get('/api/admin/dashboard').set(auth(adminToken));
     expect(res.status).toBe(200);
-    expect(res.body.data.stats.totalUsers).toBe(2);      // EV users only
-    expect(res.body.data.stats.totalStations).toBe(1);   // approved
-    expect(res.body.data.stats.totalBookings).toBe(4);   // 2 windows + the concurrent-race winner + auction win
+    expect(res.body.data.stats.totalUsers).toBe(2); // EV users only
+    expect(res.body.data.stats.totalStations).toBe(1); // approved
+    expect(res.body.data.stats.totalBookings).toBe(4); // 2 windows + the concurrent-race winner + auction win
     expect(res.body.data.chartData).toHaveLength(6);
     expect(res.body.data.chartData[5].bookings).toBe(4); // all created this month
   });
@@ -418,12 +496,12 @@ describe('E2E: admin dashboard + audit trail', () => {
 
     const logs = await api().get('/api/admin/logs').set(auth(adminToken));
     expect(logs.status).toBe(200);
-    const actions = logs.body.data.map(l => l.action);
+    const actions = logs.body.data.map((l) => l.action);
     expect(actions).toContain('USER_BLOCKED');
     expect(actions).toContain('STATION_APPROVED');
     expect(actions).toContain('ADMIN_BOOTSTRAPPED');
     // Actor names resolved
-    const blockEntry = logs.body.data.find(l => l.action === 'USER_BLOCKED');
+    const blockEntry = logs.body.data.find((l) => l.action === 'USER_BLOCKED');
     expect(blockEntry.actor.name).toBe('Root Admin');
   });
 
@@ -447,7 +525,7 @@ describe('E2E: complaints (Contact Us -> admin inbox)', () => {
       email: 'guest@x.pk',
       phone: '+92 300 1234567',
       subject: 'Charger sparked',
-      message: 'Slot 1 at GreenVolt Gulberg sparked when I plugged in my car.'
+      message: 'Slot 1 at GreenVolt Gulberg sparked when I plugged in my car.',
     });
     expect(res.status).toBe(201);
     complaintId = res.body.data.id;
@@ -458,7 +536,7 @@ describe('E2E: complaints (Contact Us -> admin inbox)', () => {
       name: 'Eva Driver',
       email: 'eva@x.pk',
       subject: 'Overcharged for session',
-      message: 'My last session shows a higher amount than the on-screen estimate.'
+      message: 'My last session shows a higher amount than the on-screen estimate.',
     });
     expect(res.status).toBe(201);
     const eva = await mockPrisma.user.findUnique({ where: { email: 'eva@x.pk' } });
@@ -467,7 +545,10 @@ describe('E2E: complaints (Contact Us -> admin inbox)', () => {
 
   it('rejects an invalid submission (bad email, short message)', async () => {
     const res = await api().post('/api/complaints').send({
-      name: 'X', email: 'not-an-email', subject: 'hm', message: 'short'
+      name: 'X',
+      email: 'not-an-email',
+      subject: 'hm',
+      message: 'short',
     });
     expect(res.status).toBe(400);
   });
@@ -480,7 +561,7 @@ describe('E2E: complaints (Contact Us -> admin inbox)', () => {
     expect(res.status).toBe(200);
     expect(res.body.pagination.total).toBe(2);
     expect(res.body.data[0].subject).toBe('Overcharged for session'); // newest first
-    expect(res.body.data[1].phone).toBe('+92 300 1234567');           // WhatsApp reply data
+    expect(res.body.data[1].phone).toBe('+92 300 1234567'); // WhatsApp reply data
   });
 
   it('admin deletes a handled complaint — and the deletion is audited', async () => {
@@ -491,7 +572,7 @@ describe('E2E: complaints (Contact Us -> admin inbox)', () => {
     expect(list.body.pagination.total).toBe(1);
 
     const logs = await api().get('/api/admin/logs').set(auth(adminToken));
-    expect(logs.body.data.map(l => l.action)).toContain('COMPLAINT_DELETED');
+    expect(logs.body.data.map((l) => l.action)).toContain('COMPLAINT_DELETED');
   });
 });
 
@@ -499,25 +580,32 @@ describe('E2E: station ratings & reviews (verified purchase only)', () => {
   let noorToken, reviewId;
 
   it('station owners cannot post reviews (EV users only)', async () => {
-    const res = await api().post('/api/reviews').set(auth(ownerToken))
+    const res = await api()
+      .post('/api/reviews')
+      .set(auth(ownerToken))
       .send({ stationId, rating: 5 });
     expect(res.status).toBe(403);
   });
 
   it('an EV user with NO paid session at the station is rejected', async () => {
-    const reg = await api().post('/api/auth/register')
+    const reg = await api()
+      .post('/api/auth/register')
       .send({ name: 'Noor Fresh', email: 'noor@x.pk', password: 'secret1', role: 'EV_USER' });
     noorToken = reg.body.data.token;
     await mockPrisma.user.update({ where: { email: 'noor@x.pk' }, data: { isVerified: true } });
 
-    const res = await api().post('/api/reviews').set(auth(noorToken))
+    const res = await api()
+      .post('/api/reviews')
+      .set(auth(noorToken))
       .send({ stationId, rating: 5, comment: 'Never even charged here' });
     expect(res.status).toBe(403);
     expect(res.body.message).toMatch(/completed and paid/i);
   });
 
   it('a paying customer (Eva) CAN post a review', async () => {
-    const res = await api().post('/api/reviews').set(auth(evToken))
+    const res = await api()
+      .post('/api/reviews')
+      .set(auth(evToken))
       .send({ stationId, rating: 5, comment: 'Fast charger, clean spot.' });
     expect(res.status).toBe(201);
     expect(res.body.data.stats).toEqual({ ratingAvg: 5, ratingCount: 1 });
@@ -525,7 +613,9 @@ describe('E2E: station ratings & reviews (verified purchase only)', () => {
   });
 
   it('posting again UPDATES the same review (one per user per station)', async () => {
-    const res = await api().post('/api/reviews').set(auth(evToken))
+    const res = await api()
+      .post('/api/reviews')
+      .set(auth(evToken))
       .send({ stationId, rating: 3, comment: 'Second visit was slower.' });
     expect(res.status).toBe(200);
     expect(res.body.data.review.id).toBe(reviewId);
@@ -533,8 +623,7 @@ describe('E2E: station ratings & reviews (verified purchase only)', () => {
   });
 
   it('rejects an out-of-range rating', async () => {
-    const res = await api().post('/api/reviews').set(auth(evToken))
-      .send({ stationId, rating: 9 });
+    const res = await api().post('/api/reviews').set(auth(evToken)).send({ stationId, rating: 9 });
     expect(res.status).toBe(400);
   });
 
@@ -545,7 +634,7 @@ describe('E2E: station ratings & reviews (verified purchase only)', () => {
     expect(pub.body.data[0].user.name).toBe('Eva Driver');
 
     const list = await api().get('/api/stations');
-    const st = list.body.data.find(s => s.id === stationId);
+    const st = list.body.data.find((s) => s.id === stationId);
     expect(st.ratingAvg).toBe(3);
     expect(st.ratingCount).toBe(1);
 
@@ -561,7 +650,7 @@ describe('E2E: station ratings & reviews (verified purchase only)', () => {
     expect(mod.status).toBe(200);
 
     const logs = await api().get('/api/admin/logs').set(auth(adminToken));
-    expect(logs.body.data.map(l => l.action)).toContain('REVIEW_DELETED');
+    expect(logs.body.data.map((l) => l.action)).toContain('REVIEW_DELETED');
 
     const pub = await api().get(`/api/reviews/station/${stationId}`);
     expect(pub.body.stats.ratingCount).toBe(0);
@@ -570,7 +659,8 @@ describe('E2E: station ratings & reviews (verified purchase only)', () => {
 
 describe('E2E: logout revokes the token server-side', () => {
   it('a token stops working immediately after logout, even though its signature is still valid', async () => {
-    const reg = await api().post('/api/auth/register')
+    const reg = await api()
+      .post('/api/auth/register')
       .send({ name: 'Lena Logout', email: 'lena@x.pk', password: 'secret1', role: 'EV_USER' });
     expect(reg.status).toBe(201);
     const lenaToken = reg.body.data.token;

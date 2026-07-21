@@ -1,6 +1,10 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { createComplaint, getComplaints, deleteComplaint } from '../controllers/complaint.controller.js';
+import {
+  createComplaint,
+  getComplaints,
+  deleteComplaint,
+} from '../controllers/complaint.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.js';
 import { createComplaintRules } from '../validators/complaintValidators.js';
@@ -14,7 +18,10 @@ const complaintLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many complaints from this device. Please try again in an hour.' }
+  message: {
+    success: false,
+    message: 'Too many complaints from this device. Please try again in an hour.',
+  },
 });
 
 router.post('/', complaintLimiter, createComplaintRules, validate, createComplaint);

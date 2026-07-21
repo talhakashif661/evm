@@ -1,5 +1,13 @@
 import express from 'express';
-import { addSlot, getStationSlots, updateSlotStatus, openAuction, closeAuction, deleteSlot, getSlotAvailability } from '../controllers/slot.controller.js';
+import {
+  addSlot,
+  getStationSlots,
+  updateSlotStatus,
+  openAuction,
+  closeAuction,
+  deleteSlot,
+  getSlotAvailability,
+} from '../controllers/slot.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();

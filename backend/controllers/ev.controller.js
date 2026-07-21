@@ -4,8 +4,15 @@ export const addEV = async (req, res, next) => {
   try {
     const { model, batteryCapacity, batteryPercentage, licensePlate } = req.body;
 
-    if (!model || batteryCapacity === undefined || batteryCapacity === null || batteryCapacity === '') {
-      return res.status(400).json({ success: false, message: 'Model and battery capacity are required' });
+    if (
+      !model ||
+      batteryCapacity === undefined ||
+      batteryCapacity === null ||
+      batteryCapacity === ''
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Model and battery capacity are required' });
     }
 
     // Validate the parsed numbers so a non-numeric string (e.g. "abc") can't be
@@ -13,14 +20,18 @@ export const addEV = async (req, res, next) => {
     // updateEV / updateBatteryLevel but was still present on the create path.
     const parsedCapacity = parseFloat(batteryCapacity);
     if (Number.isNaN(parsedCapacity) || parsedCapacity <= 0) {
-      return res.status(400).json({ success: false, message: 'Battery capacity must be a positive number' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Battery capacity must be a positive number' });
     }
 
     let parsedPercentage = 100;
     if (batteryPercentage !== undefined && batteryPercentage !== null && batteryPercentage !== '') {
       parsedPercentage = parseFloat(batteryPercentage);
       if (Number.isNaN(parsedPercentage) || parsedPercentage < 0 || parsedPercentage > 100) {
-        return res.status(400).json({ success: false, message: 'Battery percentage must be between 0 and 100' });
+        return res
+          .status(400)
+          .json({ success: false, message: 'Battery percentage must be between 0 and 100' });
       }
     }
 
@@ -30,8 +41,8 @@ export const addEV = async (req, res, next) => {
         model,
         batteryCapacity: parsedCapacity,
         batteryPercentage: parsedPercentage,
-        licensePlate
-      }
+        licensePlate,
+      },
     });
 
     res.status(201).json({ success: true, message: 'EV added successfully', data: ev });
@@ -44,7 +55,7 @@ export const getMyEVs = async (req, res, next) => {
   try {
     const evs = await prisma.eV.findMany({
       where: { userId: req.user.id },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     res.json({ success: true, data: evs });
@@ -58,7 +69,7 @@ export const updateEV = async (req, res, next) => {
     const { model, batteryCapacity, batteryPercentage, licensePlate } = req.body;
 
     const ev = await prisma.eV.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user.id },
     });
 
     if (!ev) return res.status(404).json({ success: false, message: 'EV not found' });
@@ -68,13 +79,21 @@ export const updateEV = async (req, res, next) => {
     // to MongoDB. Same for batteryCapacity: `parseFloat(x) && ...` would also
     // reject a legitimate value of 0. Validate the parsed number explicitly.
     const parsedCapacity = batteryCapacity !== undefined ? parseFloat(batteryCapacity) : undefined;
-    const parsedPercentage = batteryPercentage !== undefined ? parseFloat(batteryPercentage) : undefined;
+    const parsedPercentage =
+      batteryPercentage !== undefined ? parseFloat(batteryPercentage) : undefined;
 
     if (parsedCapacity !== undefined && (Number.isNaN(parsedCapacity) || parsedCapacity <= 0)) {
-      return res.status(400).json({ success: false, message: 'Battery capacity must be a positive number' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Battery capacity must be a positive number' });
     }
-    if (parsedPercentage !== undefined && (Number.isNaN(parsedPercentage) || parsedPercentage < 0 || parsedPercentage > 100)) {
-      return res.status(400).json({ success: false, message: 'Battery percentage must be between 0 and 100' });
+    if (
+      parsedPercentage !== undefined &&
+      (Number.isNaN(parsedPercentage) || parsedPercentage < 0 || parsedPercentage > 100)
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Battery percentage must be between 0 and 100' });
     }
 
     const updated = await prisma.eV.update({
@@ -83,8 +102,8 @@ export const updateEV = async (req, res, next) => {
         ...(model && { model }),
         ...(parsedCapacity !== undefined && { batteryCapacity: parsedCapacity }),
         ...(parsedPercentage !== undefined && { batteryPercentage: parsedPercentage }),
-        ...(licensePlate && { licensePlate })
-      }
+        ...(licensePlate && { licensePlate }),
+      },
     });
 
     res.json({ success: true, message: 'EV updated', data: updated });
@@ -96,7 +115,7 @@ export const updateEV = async (req, res, next) => {
 export const deleteEV = async (req, res, next) => {
   try {
     const ev = await prisma.eV.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user.id },
     });
 
     if (!ev) return res.status(404).json({ success: false, message: 'EV not found' });
@@ -107,14 +126,15 @@ export const deleteEV = async (req, res, next) => {
     const activeBooking = await prisma.booking.findFirst({
       where: {
         evId: req.params.id,
-        status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'ACTIVE'] }
-      }
+        status: { in: ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'ACTIVE'] },
+      },
     });
 
     if (activeBooking) {
       return res.status(409).json({
         success: false,
-        message: 'Cannot delete an EV that has an active or upcoming booking. Cancel that booking first.'
+        message:
+          'Cannot delete an EV that has an active or upcoming booking. Cancel that booking first.',
       });
     }
 
@@ -136,18 +156,20 @@ export const updateBatteryLevel = async (req, res, next) => {
     // database. Parse first, then validate the parsed number.
     const parsed = parseFloat(batteryPercentage);
     if (batteryPercentage === undefined || Number.isNaN(parsed) || parsed < 0 || parsed > 100) {
-      return res.status(400).json({ success: false, message: 'Battery percentage must be a number between 0 and 100' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Battery percentage must be a number between 0 and 100' });
     }
 
     const ev = await prisma.eV.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user.id },
     });
 
     if (!ev) return res.status(404).json({ success: false, message: 'EV not found' });
 
     const updated = await prisma.eV.update({
       where: { id: req.params.id },
-      data: { batteryPercentage: parsed }
+      data: { batteryPercentage: parsed },
     });
 
     res.json({ success: true, message: 'Battery level updated', data: updated });

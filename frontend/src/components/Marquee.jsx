@@ -16,7 +16,9 @@ export default function Marquee() {
     <div className="marquee-bar" aria-hidden="true">
       <div className="marquee-track">
         {content.map((text, i) => (
-          <span key={i}><Zap size={12} /> {text}</span>
+          <span key={i}>
+            <Zap size={12} /> {text}
+          </span>
         ))}
       </div>
     </div>

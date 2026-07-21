@@ -3,7 +3,12 @@ import { sendEmail, emailTemplates } from '../utils/email.js';
 import { expireAllStaleBookings } from '../utils/bookingExpiry.js';
 import { getIO } from '../utils/socket.js';
 import { audit } from '../utils/audit.js';
-import stripe, { toStripeAmount, STRIPE_CURRENCY, isMockPayments, MOCK_PAYMENT_DELAY_MS } from '../utils/stripe.js';
+import stripe, {
+  toStripeAmount,
+  STRIPE_CURRENCY,
+  isMockPayments,
+  MOCK_PAYMENT_DELAY_MS,
+} from '../utils/stripe.js';
 import { activateBookingPayment } from '../utils/paymentActivation.js';
 
 // Bookings are TIME WINDOWS [startTime, plannedEndTime) instead of an
@@ -44,13 +49,13 @@ export const syncSlotStatus = async (slotId) => {
       slotId,
       status: { in: LIVE },
       startTime: { lte: now },
-      OR: [{ plannedEndTime: null }, { plannedEndTime: { gt: now } }]
+      OR: [{ plannedEndTime: null }, { plannedEndTime: { gt: now } }],
     },
-    select: { id: true }
+    select: { id: true },
   });
   await prisma.slot.updateMany({
     where: { id: slotId, status: { in: ['AVAILABLE', 'RESERVED'] } },
-    data: { status: activeNow ? 'RESERVED' : 'AVAILABLE' }
+    data: { status: activeNow ? 'RESERVED' : 'AVAILABLE' },
   });
 };
 
@@ -59,12 +64,16 @@ export const createBooking = async (req, res, next) => {
     const { slotId, evId, startTime, durationMinutes } = req.body;
 
     if (!slotId || !evId || !startTime) {
-      return res.status(400).json({ success: false, message: 'Slot, EV and start time are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Slot, EV and start time are required' });
     }
 
     const start = new Date(startTime);
     if (Number.isNaN(start.getTime())) {
-      return res.status(400).json({ success: false, message: 'Start time must be a valid date/time' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Start time must be a valid date/time' });
     }
     // Small grace window so "book starting now" doesn't fail while the user
     // fills in the form, but far-past bookings are rejected.
@@ -74,7 +83,9 @@ export const createBooking = async (req, res, next) => {
 
     const duration = durationMinutes === undefined ? 60 : parseInt(durationMinutes);
     if (Number.isNaN(duration) || duration < 15 || duration > 1440) {
-      return res.status(400).json({ success: false, message: 'Duration must be between 15 and 1440 minutes' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Duration must be between 15 and 1440 minutes' });
     }
     const plannedEnd = new Date(start.getTime() + duration * 60 * 1000);
 
@@ -83,7 +94,7 @@ export const createBooking = async (req, res, next) => {
 
     const slot = await prisma.slot.findUnique({
       where: { id: slotId },
-      include: { station: true }
+      include: { station: true },
     });
 
     if (!slot) return res.status(404).json({ success: false, message: 'Slot not found' });
@@ -91,10 +102,17 @@ export const createBooking = async (req, res, next) => {
     // window on the same slot is exactly what this feature enables, so only
     // hard physical states block booking outright.
     if (['MAINTENANCE', 'OCCUPIED'].includes(slot.status)) {
-      return res.status(400).json({ success: false, message: `Slot is currently ${slot.status.toLowerCase()} — please pick another slot` });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: `Slot is currently ${slot.status.toLowerCase()} — please pick another slot`,
+        });
     }
     if (slot.auctionOpen) {
-      return res.status(400).json({ success: false, message: 'This slot is in auction mode — please bid instead' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'This slot is in auction mode — please bid instead' });
     }
     if (slot.station.status !== 'APPROVED') {
       return res.status(400).json({ success: false, message: 'Station not approved' });
@@ -107,7 +125,7 @@ export const createBooking = async (req, res, next) => {
       slotId,
       status: { in: LIVE },
       startTime: { lt: plannedEnd },
-      OR: [{ plannedEndTime: null }, { plannedEndTime: { gt: start } }]
+      OR: [{ plannedEndTime: null }, { plannedEndTime: { gt: start } }],
     };
 
     // Friendly pre-check with a useful message (tells the user WHEN the slot
@@ -115,7 +133,7 @@ export const createBooking = async (req, res, next) => {
     const conflict = await prisma.booking.findFirst({
       where: overlapWhere,
       orderBy: { startTime: 'asc' },
-      select: { startTime: true, plannedEndTime: true }
+      select: { startTime: true, plannedEndTime: true },
     });
     if (conflict) {
       const until = conflict.plannedEndTime
@@ -123,7 +141,7 @@ export const createBooking = async (req, res, next) => {
         : ' (open-ended)';
       return res.status(409).json({
         success: false,
-        message: `Slot is already booked from ${new Date(conflict.startTime).toLocaleString()}${until}. Please choose a different time window.`
+        message: `Slot is already booked from ${new Date(conflict.startTime).toLocaleString()}${until}. Please choose a different time window.`,
       });
     }
 
@@ -140,20 +158,26 @@ export const createBooking = async (req, res, next) => {
         slotId,
         status: 'CONFIRMED',
         startTime: start,
-        plannedEndTime: plannedEnd
+        plannedEndTime: plannedEnd,
       },
-      include: { slot: { include: { station: true } } }
+      include: { slot: { include: { station: true } } },
     });
 
     const contenders = await prisma.booking.findMany({
       where: overlapWhere,
-      select: { id: true }
+      select: { id: true },
     });
     if (contenders.length > 1) {
-      const winnerId = contenders.map(c => c.id).sort()[0];
+      const winnerId = contenders.map((c) => c.id).sort()[0];
       if (booking.id !== winnerId) {
         await prisma.booking.delete({ where: { id: booking.id } });
-        return res.status(409).json({ success: false, message: 'That time window was just taken by another booking. Please pick another window.' });
+        return res
+          .status(409)
+          .json({
+            success: false,
+            message:
+              'That time window was just taken by another booking. Please pick another window.',
+          });
       }
     }
 
@@ -162,12 +186,12 @@ export const createBooking = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { name: true, email: true }
+      select: { name: true, email: true },
     });
     const { subject, html } = emailTemplates.bookingConfirmed(user.name, {
       stationName: booking.slot.station.name,
       slotNumber: booking.slot.slotNumber,
-      startTime: `${start.toLocaleString()} → ${plannedEnd.toLocaleString()}`
+      startTime: `${start.toLocaleString()} → ${plannedEnd.toLocaleString()}`,
     });
     sendEmail({ to: user.email, subject, html });
 
@@ -187,7 +211,7 @@ export const getMyBookings = async (req, res, next) => {
 
     const where = {
       userId: req.user.id,
-      ...(status && { status })
+      ...(status && { status }),
     };
 
     const [bookings, total] = await Promise.all([
@@ -197,22 +221,22 @@ export const getMyBookings = async (req, res, next) => {
           ev: { select: { model: true, licensePlate: true, batteryPercentage: true } },
           slot: {
             include: {
-              station: { select: { name: true, address: true, city: true, pricePerKwh: true } }
-            }
+              station: { select: { name: true, address: true, city: true, pricePerKwh: true } },
+            },
           },
-          payment: true
+          payment: true,
         },
         skip,
         take,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       }),
-      prisma.booking.count({ where })
+      prisma.booking.count({ where }),
     ]);
 
     res.json({
       success: true,
       data: bookings,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) }
+      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
     });
   } catch (error) {
     next(error);
@@ -222,7 +246,7 @@ export const getMyBookings = async (req, res, next) => {
 export const cancelBooking = async (req, res, next) => {
   try {
     const booking = await prisma.booking.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user.id },
     });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -237,13 +261,15 @@ export const cancelBooking = async (req, res, next) => {
 
     await prisma.booking.update({
       where: { id: req.params.id },
-      data: { status: 'CANCELLED', cancelReason: 'USER_CANCELLED' }
+      data: { status: 'CANCELLED', cancelReason: 'USER_CANCELLED' },
     });
 
     // Another live booking window may cover "now", so recompute instead of
     // blindly flipping the slot to AVAILABLE.
     await syncSlotStatus(booking.slotId);
-    getIO()?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', { slotId: booking.slotId });
+    getIO()
+      ?.to(`slot:${booking.slotId}`)
+      .emit('slot:availability-changed', { slotId: booking.slotId });
 
     res.json({ success: true, message: 'Booking cancelled' });
   } catch (error) {
@@ -265,13 +291,18 @@ export const checkIn = async (req, res, next) => {
     const { evId } = req.body;
     const booking = await prisma.booking.findFirst({
       where: { id: req.params.id, userId: req.user.id },
-      include: { slot: { include: { station: true } } }
+      include: { slot: { include: { station: true } } },
     });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
     if (booking.status !== 'CONFIRMED') {
-      return res.status(400).json({ success: false, message: 'This booking cannot be checked in from its current state' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'This booking cannot be checked in from its current state',
+        });
     }
 
     // Windowed bookings must be claimed within NO_SHOW_MINUTES of their
@@ -280,9 +311,13 @@ export const checkIn = async (req, res, next) => {
     // scheduled window to be late for — their own, much longer grace period
     // is enforced by the background sweep instead (utils/bookingExpiry.js).
     if (booking.plannedEndTime) {
-      const noShowCutoff = new Date(new Date(booking.startTime).getTime() + NO_SHOW_MINUTES * 60 * 1000);
+      const noShowCutoff = new Date(
+        new Date(booking.startTime).getTime() + NO_SHOW_MINUTES * 60 * 1000
+      );
       if (new Date() > noShowCutoff) {
-        return res.status(400).json({ success: false, message: 'The check-in window for this booking has expired' });
+        return res
+          .status(400)
+          .json({ success: false, message: 'The check-in window for this booking has expired' });
       }
     }
 
@@ -297,7 +332,13 @@ export const checkIn = async (req, res, next) => {
     // Auction wins: the winning bid, already stored as totalCost when the
     // auction closed, IS the final price — use it as-is.
     const totalCost = booking.plannedEndTime
-      ? parseFloat((((new Date(booking.plannedEndTime) - new Date(booking.startTime)) / 3600000) * (booking.slot.powerKw || 0) * booking.slot.station.pricePerKwh).toFixed(2))
+      ? parseFloat(
+          (
+            ((new Date(booking.plannedEndTime) - new Date(booking.startTime)) / 3600000) *
+            (booking.slot.powerKw || 0) *
+            booking.slot.station.pricePerKwh
+          ).toFixed(2)
+        )
       : booking.totalCost;
 
     const now = new Date();
@@ -308,14 +349,22 @@ export const checkIn = async (req, res, next) => {
         checkInTime: now,
         actualEvId,
         paymentDeadline: new Date(now.getTime() + PAYMENT_GRACE_MINUTES * 60 * 1000),
-        totalCost
-      }
+        totalCost,
+      },
     });
 
-    getIO()?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', { slotId: booking.slotId });
-    getIO()?.to(`user:${req.user.id}`).emit('booking:status-changed', { bookingId: booking.id, status: 'CHECKED_IN' });
+    getIO()
+      ?.to(`slot:${booking.slotId}`)
+      .emit('slot:availability-changed', { slotId: booking.slotId });
+    getIO()
+      ?.to(`user:${req.user.id}`)
+      .emit('booking:status-changed', { bookingId: booking.id, status: 'CHECKED_IN' });
 
-    res.json({ success: true, message: 'Checked in — please complete payment to begin charging', data: updated });
+    res.json({
+      success: true,
+      message: 'Checked in — please complete payment to begin charging',
+      data: updated,
+    });
   } catch (error) {
     next(error);
   }
@@ -335,15 +384,19 @@ export const checkIn = async (req, res, next) => {
 export const createBookingPaymentIntent = async (req, res, next) => {
   try {
     const booking = await prisma.booking.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user.id },
     });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
     if (booking.status !== 'CHECKED_IN') {
-      return res.status(400).json({ success: false, message: 'This booking is not awaiting payment' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'This booking is not awaiting payment' });
     }
     if (new Date() > new Date(booking.paymentDeadline)) {
-      return res.status(400).json({ success: false, message: 'The payment window for this booking has expired' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'The payment window for this booking has expired' });
     }
     if (!booking.totalCost) {
       return res.status(400).json({ success: false, message: 'No amount to pay' });
@@ -357,10 +410,21 @@ export const createBookingPaymentIntent = async (req, res, next) => {
     // boundary the real webhook enforces, see the comment in payment.routes.js.
     if (isMockPayments) {
       const mockIntentId = `pi_mock_${booking.id}_${Date.now()}`;
-      await prisma.booking.update({ where: { id: booking.id }, data: { paymentIntentId: mockIntentId } });
-      if (MOCK_PAYMENT_DELAY_MS > 0) await new Promise(resolve => setTimeout(resolve, MOCK_PAYMENT_DELAY_MS));
-      await activateBookingPayment({ bookingId: booking.id, method: 'MOCK', stripePaymentIntentId: mockIntentId });
-      return res.json({ success: true, data: { clientSecret: null, amount: booking.totalCost, mock: true } });
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { paymentIntentId: mockIntentId },
+      });
+      if (MOCK_PAYMENT_DELAY_MS > 0)
+        await new Promise((resolve) => setTimeout(resolve, MOCK_PAYMENT_DELAY_MS));
+      await activateBookingPayment({
+        bookingId: booking.id,
+        method: 'MOCK',
+        stripePaymentIntentId: mockIntentId,
+      });
+      return res.json({
+        success: true,
+        data: { clientSecret: null, amount: booking.totalCost, mock: true },
+      });
     }
 
     // Reuse a still-open PaymentIntent instead of minting a new one on every
@@ -369,8 +433,18 @@ export const createBookingPaymentIntent = async (req, res, next) => {
     // double charge if both got confirmed.
     if (booking.paymentIntentId) {
       const existing = await stripe.paymentIntents.retrieve(booking.paymentIntentId);
-      if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(existing.status)) {
-        return res.json({ success: true, data: { clientSecret: existing.client_secret, amount: booking.totalCost } });
+      if (
+        [
+          'requires_payment_method',
+          'requires_confirmation',
+          'requires_action',
+          'processing',
+        ].includes(existing.status)
+      ) {
+        return res.json({
+          success: true,
+          data: { clientSecret: existing.client_secret, amount: booking.totalCost },
+        });
       }
       // Existing intent is terminal (e.g. a prior card was declined) — fall
       // through and create a genuinely new one for this retry.
@@ -379,12 +453,18 @@ export const createBookingPaymentIntent = async (req, res, next) => {
     const intent = await stripe.paymentIntents.create({
       amount: toStripeAmount(booking.totalCost),
       currency: STRIPE_CURRENCY,
-      metadata: { bookingId: booking.id, userId: req.user.id }
+      metadata: { bookingId: booking.id, userId: req.user.id },
     });
 
-    await prisma.booking.update({ where: { id: booking.id }, data: { paymentIntentId: intent.id } });
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { paymentIntentId: intent.id },
+    });
 
-    res.json({ success: true, data: { clientSecret: intent.client_secret, amount: booking.totalCost } });
+    res.json({
+      success: true,
+      data: { clientSecret: intent.client_secret, amount: booking.totalCost },
+    });
   } catch (error) {
     next(error);
   }
@@ -394,7 +474,7 @@ export const completeBooking = async (req, res, next) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { id: req.params.id },
-      include: { slot: { include: { station: true } }, ev: true }
+      include: { slot: { include: { station: true } }, ev: true },
     });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -408,7 +488,7 @@ export const completeBooking = async (req, res, next) => {
     if (!isStationOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Only the station owner can complete a booking'
+        message: 'Only the station owner can complete a booking',
       });
     }
 
@@ -418,7 +498,12 @@ export const completeBooking = async (req, res, next) => {
     // auction-booking fallback and was a real bug: it let an owner skip
     // check-in and payment entirely for ANY booking, not just auction wins.
     if (booking.status !== 'ACTIVE') {
-      return res.status(400).json({ success: false, message: 'Booking cannot be completed until it has been paid (status must be ACTIVE)' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'Booking cannot be completed until it has been paid (status must be ACTIVE)',
+        });
     }
 
     const endTime = new Date();
@@ -435,16 +520,20 @@ export const completeBooking = async (req, res, next) => {
     let overageAmount = null;
     if (booking.plannedEndTime && endTime > new Date(booking.plannedEndTime)) {
       const overageHours = (endTime - new Date(booking.plannedEndTime)) / 3600000;
-      overageAmount = parseFloat((overageHours * (booking.slot.powerKw || 0) * booking.slot.station.pricePerKwh).toFixed(2));
+      overageAmount = parseFloat(
+        (overageHours * (booking.slot.powerKw || 0) * booking.slot.station.pricePerKwh).toFixed(2)
+      );
     }
 
     await prisma.booking.update({
       where: { id: req.params.id },
-      data: { status: 'COMPLETED', endTime, totalCost, overageAmount }
+      data: { status: 'COMPLETED', endTime, totalCost, overageAmount },
     });
 
     await syncSlotStatus(booking.slotId);
-    getIO()?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', { slotId: booking.slotId });
+    getIO()
+      ?.to(`slot:${booking.slotId}`)
+      .emit('slot:availability-changed', { slotId: booking.slotId });
 
     // Revenue is credited when the user actually pays (see payment.routes.js),
     // not here — completion alone isn't money collected. Overage is a
@@ -453,7 +542,7 @@ export const completeBooking = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Booking completed',
-      data: { totalCost, overageAmount, energyUsed: energyUsed.toFixed(2) }
+      data: { totalCost, overageAmount, energyUsed: energyUsed.toFixed(2) },
     });
   } catch (error) {
     next(error);
@@ -473,8 +562,8 @@ export const ownerCancelBooking = async (req, res, next) => {
       include: {
         slot: { include: { station: true } },
         user: { select: { name: true, email: true } },
-        payment: true
-      }
+        payment: true,
+      },
     });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -482,11 +571,15 @@ export const ownerCancelBooking = async (req, res, next) => {
     const isStationOwner = booking.slot.station.ownerId === req.user.id;
     const isAdmin = req.user.role === 'ADMIN';
     if (!isStationOwner && !isAdmin) {
-      return res.status(403).json({ success: false, message: 'Only the station owner can cancel this booking' });
+      return res
+        .status(403)
+        .json({ success: false, message: 'Only the station owner can cancel this booking' });
     }
 
     if (!['CONFIRMED', 'CHECKED_IN', 'ACTIVE'].includes(booking.status)) {
-      return res.status(400).json({ success: false, message: 'Booking cannot be cancelled in its current state' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Booking cannot be cancelled in its current state' });
     }
 
     let refunded = false;
@@ -494,17 +587,20 @@ export const ownerCancelBooking = async (req, res, next) => {
       if (booking.payment.stripePaymentIntentId) {
         await stripe.refunds.create({ payment_intent: booking.payment.stripePaymentIntentId });
       }
-      await prisma.payment.update({ where: { id: booking.payment.id }, data: { status: 'REFUNDED' } });
+      await prisma.payment.update({
+        where: { id: booking.payment.id },
+        data: { status: 'REFUNDED' },
+      });
       await prisma.chargingStation.update({
         where: { id: booking.slot.stationId },
-        data: { totalRevenue: { decrement: booking.payment.amount } }
+        data: { totalRevenue: { decrement: booking.payment.amount } },
       });
       refunded = true;
     }
 
     await prisma.booking.update({
       where: { id: req.params.id },
-      data: { status: 'CANCELLED', cancelReason: 'OWNER_CANCELLED' }
+      data: { status: 'CANCELLED', cancelReason: 'OWNER_CANCELLED' },
     });
 
     await syncSlotStatus(booking.slotId);
@@ -512,18 +608,29 @@ export const ownerCancelBooking = async (req, res, next) => {
     const { subject, html } = emailTemplates.bookingOwnerCancelled(booking.user.name, {
       stationName: booking.slot.station.name,
       slotNumber: booking.slot.slotNumber,
-      refunded
+      refunded,
     });
     sendEmail({ to: booking.user.email, subject, html });
 
-    getIO()?.to(`user:${booking.userId}`).emit('booking:status-changed', { bookingId: booking.id, status: 'CANCELLED', reason: 'OWNER_CANCELLED' });
-    getIO()?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', { slotId: booking.slotId });
+    getIO()
+      ?.to(`user:${booking.userId}`)
+      .emit('booking:status-changed', {
+        bookingId: booking.id,
+        status: 'CANCELLED',
+        reason: 'OWNER_CANCELLED',
+      });
+    getIO()
+      ?.to(`slot:${booking.slotId}`)
+      .emit('slot:availability-changed', { slotId: booking.slotId });
 
-    audit(req, 'BOOKING_OWNER_CANCELLED', `Cancelled booking ${booking.id} for ${booking.user.email}${refunded ? ' (refunded)' : ''}`);
+    audit(
+      req,
+      'BOOKING_OWNER_CANCELLED',
+      `Cancelled booking ${booking.id} for ${booking.user.email}${refunded ? ' (refunded)' : ''}`
+    );
 
     res.json({ success: true, message: 'Booking cancelled', data: { refunded } });
   } catch (error) {
     next(error);
   }
 };
-

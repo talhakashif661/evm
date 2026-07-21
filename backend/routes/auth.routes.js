@@ -1,8 +1,22 @@
 import express from 'express';
-import { register, login, logout, getMe, changePassword, setupAdmin, forgotPassword, resetPassword } from '../controllers/auth.controller.js';
+import {
+  register,
+  login,
+  logout,
+  getMe,
+  changePassword,
+  setupAdmin,
+  forgotPassword,
+  resetPassword,
+} from '../controllers/auth.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.js';
-import { registerRules, loginRules, forgotPasswordRules, resetPasswordRules } from '../validators/authValidators.js';
+import {
+  registerRules,
+  loginRules,
+  forgotPasswordRules,
+  resetPasswordRules,
+} from '../validators/authValidators.js';
 
 const router = express.Router();
 

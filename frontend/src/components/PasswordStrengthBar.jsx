@@ -18,7 +18,16 @@ export function PasswordStrengthBar({ password }) {
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', gap: 4 }}>
         {[...Array(5)].map((_, i) => (
-          <div key={i} style={{ height: 4, flex: 1, borderRadius: 2, background: i < score ? color : 'var(--border)', transition: 'background 0.2s' }} />
+          <div
+            key={i}
+            style={{
+              height: 4,
+              flex: 1,
+              borderRadius: 2,
+              background: i < score ? color : 'var(--border)',
+              transition: 'background 0.2s',
+            }}
+          />
         ))}
       </div>
       <span style={{ fontSize: '0.72rem', color, fontWeight: 600 }}>{label}</span>

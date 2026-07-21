@@ -14,9 +14,9 @@ import SEO from '../components/SEO';
 
 export default function AuctionHub() {
   const dispatch = useDispatch();
-  const { bids, results } = useSelector(s => s.bids);
-  const { stations } = useSelector(s => s.stations);
-  const { user } = useSelector(s => s.auth);
+  const { bids, results } = useSelector((s) => s.bids);
+  const { stations } = useSelector((s) => s.stations);
+  const { user } = useSelector((s) => s.auth);
   const [tab, setTab] = useState('live');
 
   useEffect(() => {
@@ -35,14 +35,18 @@ export default function AuctionHub() {
   // case: station A's auction closing while station B's opens keeps the
   // total count the same, but the room subscriptions genuinely need to change).
   const openSlotIdsKey = useMemo(
-    () => stations.flatMap(s => (s.slots || []).filter(sl => sl.auctionOpen).map(sl => sl.id)).sort().join(','),
+    () =>
+      stations
+        .flatMap((s) => (s.slots || []).filter((sl) => sl.auctionOpen).map((sl) => sl.id))
+        .sort()
+        .join(','),
     [stations]
   );
 
   useEffect(() => {
     const socket = getSocket();
     const openSlotIds = openSlotIdsKey ? openSlotIdsKey.split(',') : [];
-    openSlotIds.forEach(id => socket.emit('join:slot', id));
+    openSlotIds.forEach((id) => socket.emit('join:slot', id));
 
     const refresh = () => dispatch(fetchStations({ limit: 50 }));
     const handleClosed = () => {
@@ -57,7 +61,7 @@ export default function AuctionHub() {
     socket.on('auction:closed', handleClosed);
 
     return () => {
-      openSlotIds.forEach(id => socket.emit('leave:slot', id));
+      openSlotIds.forEach((id) => socket.emit('leave:slot', id));
       socket.off('bid:update', refresh);
       socket.off('auction:opened', refresh);
       socket.off('auction:closed', handleClosed);
@@ -81,7 +85,12 @@ export default function AuctionHub() {
       toast.success(
         <span>
           You won the auction at {stationName} for {toPKR(amount)}!{' '}
-          <Link to="/bookings" style={{ color: 'inherit', fontWeight: 700, textDecoration: 'underline' }}>View My Bookings</Link>
+          <Link
+            to="/bookings"
+            style={{ color: 'inherit', fontWeight: 700, textDecoration: 'underline' }}
+          >
+            View My Bookings
+          </Link>
         </span>,
         { autoClose: 12000 }
       );
@@ -109,15 +118,15 @@ export default function AuctionHub() {
   }, [dispatch, user?.id]);
 
   const auctionStations = useMemo(
-    () => stations.filter(s => s.slots?.some(sl => sl.auctionOpen)),
+    () => stations.filter((s) => s.slots?.some((sl) => sl.auctionOpen)),
     [stations]
   );
-  const activeBids = bids.filter(b => b.status === 'PENDING');
+  const activeBids = bids.filter((b) => b.status === 'PENDING');
 
   const tabs = [
     { id: 'live', label: 'Live Auctions', icon: Zap, count: auctionStations.length },
     { id: 'mybids', label: 'My Bids', icon: Target, count: activeBids.length },
-    { id: 'results', label: 'Results', icon: Trophy, count: results.length }
+    { id: 'results', label: 'Results', icon: Trophy, count: results.length },
   ];
 
   return (
@@ -128,142 +137,331 @@ export default function AuctionHub() {
         noIndex
       />
       <div style={{ marginBottom: 32 }}>
-        <h1 className="section-title">Auction <span>Hub</span></h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Bid on charging slots — priority wins</p>
+        <h1 className="section-title">
+          Auction <span>Hub</span>
+        </h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          Bid on charging slots — priority wins
+        </p>
       </div>
 
       {/* Auction explanation */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{
-        padding: 20, marginBottom: 28,
-        background: 'var(--bg-elevated)',
-        border: '1px solid var(--border)', borderRadius: 6
-      }}>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 0, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{
+          padding: 20,
+          marginBottom: 28,
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+        }}
+      >
+        <p
+          style={{
+            color: 'var(--text-secondary)',
+            fontSize: '0.88rem',
+            marginBottom: 0,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 8,
+          }}
+        >
           <Trophy size={18} style={{ flexShrink: 0, marginTop: 2, color: 'var(--gold)' }} />
-          <span><strong style={{ color: 'var(--gold)' }}>How Auctions Work:</strong> Station owners open slots for bidding.
-          Priority score = <strong>60% bid amount + 40% battery urgency</strong>.
-          Critical battery (≤20%) gets a major urgency boost — ensuring emergency vehicles always get priority.</span>
+          <span>
+            <strong style={{ color: 'var(--gold)' }}>How Auctions Work:</strong> Station owners open
+            slots for bidding. Priority score ={' '}
+            <strong>60% bid amount + 40% battery urgency</strong>. Critical battery (≤20%) gets a
+            major urgency boost — ensuring emergency vehicles always get priority.
+          </span>
         </p>
       </motion.div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 28 }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer',
-            borderBottom: tab === t.id ? '2px solid var(--gold)' : '2px solid transparent',
-            color: tab === t.id ? 'var(--gold)' : 'var(--text-secondary)',
-            fontFamily: 'Inter', fontWeight: 600, fontSize: '0.95rem', marginBottom: -1,
-            transition: 'border-color 0.12s ease, color 0.12s ease'
-          }}>
-            <t.icon size={16} /> {t.label} {t.count > 0 && <span style={{ fontSize: '0.75rem', marginLeft: 4, opacity: 0.8 }}>({t.count})</span>}
+      <div
+        style={{
+          display: 'flex',
+          gap: 4,
+          borderBottom: '1px solid var(--border)',
+          marginBottom: 28,
+        }}
+      >
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '10px 20px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              borderBottom: tab === t.id ? '2px solid var(--gold)' : '2px solid transparent',
+              color: tab === t.id ? 'var(--gold)' : 'var(--text-secondary)',
+              fontFamily: 'Inter',
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              marginBottom: -1,
+              transition: 'border-color 0.12s ease, color 0.12s ease',
+            }}
+          >
+            <t.icon size={16} /> {t.label}{' '}
+            {t.count > 0 && (
+              <span style={{ fontSize: '0.75rem', marginLeft: 4, opacity: 0.8 }}>({t.count})</span>
+            )}
           </button>
         ))}
       </div>
 
       {/* Live Auctions */}
-      {tab === 'live' && (
-        auctionStations.length === 0 ? (
+      {tab === 'live' &&
+        (auctionStations.length === 0 ? (
           <EmptyState
             icon={<Trophy size={48} color="var(--text-muted)" strokeWidth={1.5} />}
             title="No Active Auctions"
-            subtitle={user?.role === 'STATION_OWNER'
-              ? "Check back later, or open one on your own station's slots."
-              : "Check back later for live slot auctions."}
-            action={user?.role === 'STATION_OWNER'
-              ? <Link to="/owner/station"><button className="btn-primary">Manage My Station <ArrowRight size={14} /></button></Link>
-              : undefined}
+            subtitle={
+              user?.role === 'STATION_OWNER'
+                ? "Check back later, or open one on your own station's slots."
+                : 'Check back later for live slot auctions.'
+            }
+            action={
+              user?.role === 'STATION_OWNER' ? (
+                <Link to="/owner/station">
+                  <button className="btn-primary">
+                    Manage My Station <ArrowRight size={14} />
+                  </button>
+                </Link>
+              ) : undefined
+            }
           />
         ) : (
           <div className="row g-4">
-            {auctionStations.map(station => (
+            {auctionStations.map((station) => (
               <div key={station.id} className="col-12 col-md-6">
-                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="ev-card" style={{ padding: 24 }}>
-                  <h2 style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.45rem', letterSpacing: '0.02em', marginBottom: 6 }}>{station.name}</h2>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="ev-card"
+                  style={{ padding: 24 }}
+                >
+                  <h2
+                    style={{
+                      fontFamily: 'Georgia, "Times New Roman", serif',
+                      fontWeight: 700,
+                      fontSize: '1.45rem',
+                      letterSpacing: '0.02em',
+                      marginBottom: 6,
+                    }}
+                  >
+                    {station.name}
+                  </h2>
+                  <p
+                    style={{
+                      color: 'var(--text-muted)',
+                      fontSize: '0.82rem',
+                      marginBottom: 16,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
                     <MapPin size={13} /> {station.city}
                   </p>
-                  {station.slots?.filter(sl => sl.auctionOpen).map(slot => (
-                    <div key={slot.id} style={{ padding: 12, background: '#F1E3D3', border: '1px solid #DEC49E', borderRadius: 4, marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontWeight: 600 }}>Slot #{slot.slotNumber} · {slot.powerKw}kW</span>
-                        <span style={{ color: 'var(--warning)', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Trophy size={13} /> LIVE
-                        </span>
-                      </div>
-                      {slot.auctionEnd && (
-                        <p style={{ color: 'var(--warning)', fontSize: '0.75rem', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Clock size={12} /> Ends in <Countdown deadline={slot.auctionEnd} />
+                  {station.slots
+                    ?.filter((sl) => sl.auctionOpen)
+                    .map((slot) => (
+                      <div
+                        key={slot.id}
+                        style={{
+                          padding: 12,
+                          background: '#F1E3D3',
+                          border: '1px solid #DEC49E',
+                          borderRadius: 4,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 6,
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>
+                            Slot #{slot.slotNumber} · {slot.powerKw}kW
+                          </span>
+                          <span
+                            style={{
+                              color: 'var(--warning)',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            <Trophy size={13} /> LIVE
+                          </span>
+                        </div>
+                        {slot.auctionEnd && (
+                          <p
+                            style={{
+                              color: 'var(--warning)',
+                              fontSize: '0.75rem',
+                              marginBottom: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            <Clock size={12} /> Ends in <Countdown deadline={slot.auctionEnd} />
+                          </p>
+                        )}
+                        <Link to={`/stations/${station.id}`}>
+                          <button
+                            className="btn-primary"
+                            style={{
+                              width: '100%',
+                              padding: '7px',
+                              fontSize: '0.82rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            Place Bid <ArrowRight size={14} />
+                          </button>
+                        </Link>
+                        <p className="cta-microcopy" style={{ textAlign: 'center', marginTop: 6 }}>
+                          Charged only if you win
                         </p>
-                      )}
-                      <Link to={`/stations/${station.id}`}>
-                        <button className="btn-primary" style={{ width: '100%', padding: '7px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                          Place Bid <ArrowRight size={14} />
-                        </button>
-                      </Link>
-                      <p className="cta-microcopy" style={{ textAlign: 'center', marginTop: 6 }}>Charged only if you win</p>
-                    </div>
-                  ))}
+                      </div>
+                    ))}
                 </motion.div>
               </div>
             ))}
           </div>
-        )
-      )}
+        ))}
 
       {/* My Bids */}
-      {tab === 'mybids' && (
-        activeBids.length === 0 ? (
-          <EmptyState icon={<Target size={48} color="var(--text-muted)" strokeWidth={1.5} />} title="No Active Bids" subtitle="Visit a station with an active auction to place a bid." />
+      {tab === 'mybids' &&
+        (activeBids.length === 0 ? (
+          <EmptyState
+            icon={<Target size={48} color="var(--text-muted)" strokeWidth={1.5} />}
+            title="No Active Bids"
+            subtitle="Visit a station with an active auction to place a bid."
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {activeBids.map((bid, i) => (
-              <motion.div key={bid.id} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                className="ev-card" style={{ padding: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <motion.div
+                key={bid.id}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="ev-card"
+                style={{ padding: 20 }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                  }}
+                >
                   <div>
-                    <p style={{ fontWeight: 600, marginBottom: 4 }}>{bid.slot?.station?.name} · Slot #{bid.slot?.slotNumber}</p>
+                    <p style={{ fontWeight: 600, marginBottom: 4 }}>
+                      {bid.slot?.station?.name} · Slot #{bid.slot?.slotNumber}
+                    </p>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                       Bid: <strong style={{ color: 'var(--gold)' }}>{toPKR(bid.amount)}</strong> ·
-                      Battery: {bid.batteryLevel}% ·
-                      Priority: <strong style={{ color: 'var(--info)' }}>{bid.priority?.toFixed(1)}</strong>
+                      Battery: {bid.batteryLevel}% · Priority:{' '}
+                      <strong style={{ color: 'var(--info)' }}>{bid.priority?.toFixed(1)}</strong>
                     </p>
                   </div>
-                  <button onClick={() => dispatch(cancelBid(bid.id))}
-                    style={{ padding: '6px 14px', background: '#F3E1DE', border: '1px solid #E0BAB4', borderRadius: 4, color: 'var(--danger)', cursor: 'pointer', fontSize: '0.82rem' }}>
+                  <button
+                    onClick={() => dispatch(cancelBid(bid.id))}
+                    style={{
+                      padding: '6px 14px',
+                      background: '#F3E1DE',
+                      border: '1px solid #E0BAB4',
+                      borderRadius: 4,
+                      color: 'var(--danger)',
+                      cursor: 'pointer',
+                      fontSize: '0.82rem',
+                    }}
+                  >
                     Cancel Bid
                   </button>
                 </div>
               </motion.div>
             ))}
           </div>
-        )
-      )}
+        ))}
 
       {/* Results */}
-      {tab === 'results' && (
-        results.length === 0 ? (
-          <EmptyState icon={<BarChart3 size={48} color="var(--text-muted)" strokeWidth={1.5} />} title="No Auction Results Yet" subtitle="Results will appear here after auctions close." />
+      {tab === 'results' &&
+        (results.length === 0 ? (
+          <EmptyState
+            icon={<BarChart3 size={48} color="var(--text-muted)" strokeWidth={1.5} />}
+            title="No Auction Results Yet"
+            subtitle="Results will appear here after auctions close."
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {results.map((bid, i) => (
-              <motion.div key={bid.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
-                className="ev-card" style={{ padding: 20, borderLeft: `3px solid ${bid.status === 'WON' ? 'var(--gold)' : 'var(--danger)'}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <motion.div
+                key={bid.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: i * 0.05 }}
+                className="ev-card"
+                style={{
+                  padding: 20,
+                  borderLeft: `3px solid ${bid.status === 'WON' ? 'var(--gold)' : 'var(--danger)'}`,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}
+                >
                   <div>
-                    <p style={{ fontWeight: 600, marginBottom: 4 }}>{bid.slot?.station?.name} · Slot #{bid.slot?.slotNumber}</p>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Your bid: {toPKR(bid.amount)}</p>
+                    <p style={{ fontWeight: 600, marginBottom: 4 }}>
+                      {bid.slot?.station?.name} · Slot #{bid.slot?.slotNumber}
+                    </p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                      Your bid: {toPKR(bid.amount)}
+                    </p>
                   </div>
-                  <span className={bid.status === 'WON' ? 'badge-gold' : 'badge-danger'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    {bid.status === 'WON' ? <><Trophy size={12} /> WON</> : <><XCircle size={12} /> LOST</>}
+                  <span
+                    className={bid.status === 'WON' ? 'badge-gold' : 'badge-danger'}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    {bid.status === 'WON' ? (
+                      <>
+                        <Trophy size={12} /> WON
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={12} /> LOST
+                      </>
+                    )}
                   </span>
                 </div>
               </motion.div>
             ))}
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }

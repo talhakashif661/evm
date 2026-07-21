@@ -10,8 +10,12 @@ const NO_SHOW_MINUTES = parseInt(process.env.NO_SHOW_MINUTES || '15');
 const AUCTION_WIN_GRACE_HOURS = parseInt(process.env.AUCTION_WIN_GRACE_HOURS || '2');
 
 const notify = (booking, status, reason) => {
-  getIO()?.to(`user:${booking.userId}`).emit('booking:status-changed', { bookingId: booking.id, status, reason });
-  getIO()?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', { slotId: booking.slotId });
+  getIO()
+    ?.to(`user:${booking.userId}`)
+    .emit('booking:status-changed', { bookingId: booking.id, status, reason });
+  getIO()
+    ?.to(`slot:${booking.slotId}`)
+    .emit('slot:availability-changed', { slotId: booking.slotId });
 };
 
 // A CONFIRMED booking whose planned window fully elapsed without the owner
@@ -27,9 +31,9 @@ export const expireStaleBookings = async (extraWhere = {}) => {
     where: {
       status: { in: ['PENDING', 'CONFIRMED'] },
       plannedEndTime: { not: null, lt: new Date() },
-      ...extraWhere
+      ...extraWhere,
     },
-    data: { status: 'CANCELLED', cancelReason: 'NO_SHOW' }
+    data: { status: 'CANCELLED', cancelReason: 'NO_SHOW' },
   });
 };
 
@@ -52,23 +56,29 @@ export const expireNoShowBookings = async (extraWhere = {}) => {
       status: 'CONFIRMED',
       OR: [
         { plannedEndTime: { not: null }, startTime: { lt: cutoff } },
-        { plannedEndTime: null, startTime: { lt: abandonedCutoff } }
+        { plannedEndTime: null, startTime: { lt: abandonedCutoff } },
       ],
-      ...extraWhere
+      ...extraWhere,
     },
-    include: { user: { select: { name: true, email: true } }, slot: { select: { slotNumber: true, station: { select: { name: true } } } } }
+    include: {
+      user: { select: { name: true, email: true } },
+      slot: { select: { slotNumber: true, station: { select: { name: true } } } },
+    },
   });
 
   for (const booking of stale) {
     const isAuctionWin = !booking.plannedEndTime;
     const reason = isAuctionWin ? 'AUCTION_WIN_ABANDONED' : 'NO_SHOW';
-    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'CANCELLED', cancelReason: reason } });
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: 'CANCELLED', cancelReason: reason },
+    });
 
     const template = isAuctionWin ? emailTemplates.auctionWinExpired : emailTemplates.bookingNoShow;
     const { subject, html } = template(booking.user.name, {
       stationName: booking.slot.station.name,
       slotNumber: booking.slot.slotNumber,
-      noShowMinutes: NO_SHOW_MINUTES
+      noShowMinutes: NO_SHOW_MINUTES,
     });
     sendEmail({ to: booking.user.email, subject, html });
     notify(booking, 'CANCELLED', reason);
@@ -86,15 +96,21 @@ export const expirePaymentTimeouts = async (extraWhere = {}) => {
   const now = new Date();
   const stale = await prisma.booking.findMany({
     where: { status: 'CHECKED_IN', paymentDeadline: { lt: now }, ...extraWhere },
-    include: { user: { select: { name: true, email: true } }, slot: { select: { slotNumber: true, station: { select: { name: true } } } } }
+    include: {
+      user: { select: { name: true, email: true } },
+      slot: { select: { slotNumber: true, station: { select: { name: true } } } },
+    },
   });
 
   for (const booking of stale) {
-    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'CANCELLED', cancelReason: 'PAYMENT_TIMEOUT' } });
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: 'CANCELLED', cancelReason: 'PAYMENT_TIMEOUT' },
+    });
 
     const { subject, html } = emailTemplates.bookingPaymentTimeout(booking.user.name, {
       stationName: booking.slot.station.name,
-      slotNumber: booking.slot.slotNumber
+      slotNumber: booking.slot.slotNumber,
     });
     sendEmail({ to: booking.user.email, subject, html });
     notify(booking, 'CANCELLED', 'PAYMENT_TIMEOUT');

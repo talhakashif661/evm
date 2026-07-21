@@ -27,41 +27,53 @@ export const fetchStations = createAsyncThunk(
   }
 );
 
-export const fetchStationById = createAsyncThunk('stations/fetchById', async (id, { rejectWithValue }) => {
-  try {
-    const res = await api.get(`/stations/${id}`);
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const fetchStationById = createAsyncThunk(
+  'stations/fetchById',
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/stations/${id}`);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
-export const fetchMyStation = createAsyncThunk('stations/fetchMine', async (_, { rejectWithValue }) => {
-  try {
-    const res = await api.get('/stations/owner/mine');
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const fetchMyStation = createAsyncThunk(
+  'stations/fetchMine',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get('/stations/owner/mine');
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
-export const createStation = createAsyncThunk('stations/create', async (data, { rejectWithValue }) => {
-  try {
-    const res = await api.post('/stations', data);
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const createStation = createAsyncThunk(
+  'stations/create',
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await api.post('/stations', data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
-export const fetchStationSlots = createAsyncThunk('stations/fetchSlots', async (stationId, { rejectWithValue }) => {
-  try {
-    const res = await api.get(`/slots/station/${stationId}`);
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const fetchStationSlots = createAsyncThunk(
+  'stations/fetchSlots',
+  async (stationId, { rejectWithValue }) => {
+    try {
+      const res = await api.get(`/slots/station/${stationId}`);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
 export const addSlot = createAsyncThunk('stations/addSlot', async (data, { rejectWithValue }) => {
   try {
@@ -72,23 +84,29 @@ export const addSlot = createAsyncThunk('stations/addSlot', async (data, { rejec
   }
 });
 
-export const openSlotAuction = createAsyncThunk('stations/openAuction', async ({ slotId, durationMinutes }, { rejectWithValue }) => {
-  try {
-    const res = await api.post(`/slots/${slotId}/auction/open`, { durationMinutes });
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const openSlotAuction = createAsyncThunk(
+  'stations/openAuction',
+  async ({ slotId, durationMinutes }, { rejectWithValue }) => {
+    try {
+      const res = await api.post(`/slots/${slotId}/auction/open`, { durationMinutes });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
-export const closeSlotAuction = createAsyncThunk('stations/closeAuction', async (slotId, { rejectWithValue }) => {
-  try {
-    const res = await api.post(`/slots/${slotId}/auction/close`);
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const closeSlotAuction = createAsyncThunk(
+  'stations/closeAuction',
+  async (slotId, { rejectWithValue }) => {
+    try {
+      const res = await api.post(`/slots/${slotId}/auction/close`);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
 const stationSlice = createSlice({
   name: 'stations',
@@ -101,14 +119,18 @@ const stationSlice = createSlice({
     loading: false,
     error: null,
     lastFetchedAt: null,
-    lastQueryKey: null
+    lastQueryKey: null,
   },
   reducers: {
-    clearCurrentStation: (state) => { state.currentStation = null; }
+    clearCurrentStation: (state) => {
+      state.currentStation = null;
+    },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchStations.pending, (state) => { state.loading = true; })
+      .addCase(fetchStations.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(fetchStations.fulfilled, (state, action) => {
         state.loading = false;
         state.stations = action.payload.data;
@@ -124,7 +146,9 @@ const stationSlice = createSlice({
       .addCase(fetchStationById.fulfilled, (state, action) => {
         state.currentStation = action.payload.data;
       })
-      .addCase(fetchMyStation.pending, (state) => { state.loading = true; })
+      .addCase(fetchMyStation.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(fetchMyStation.fulfilled, (state, action) => {
         state.loading = false;
         state.myStation = action.payload.data;
@@ -147,14 +171,14 @@ const stationSlice = createSlice({
       })
       .addCase(addSlot.rejected, (_, action) => toast.error(action.payload))
       .addCase(openSlotAuction.fulfilled, (state, action) => {
-        const idx = state.slots.findIndex(s => s.id === action.payload.data.id);
+        const idx = state.slots.findIndex((s) => s.id === action.payload.data.id);
         if (idx !== -1) state.slots[idx] = action.payload.data;
         toast.success('Auction opened!');
       })
       .addCase(closeSlotAuction.fulfilled, (_, action) => {
         toast.success(action.payload.message || 'Auction closed');
       });
-  }
+  },
 });
 
 export const { clearCurrentStation } = stationSlice.actions;

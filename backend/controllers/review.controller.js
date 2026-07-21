@@ -7,7 +7,7 @@ export const ratingStatsFor = async (stationIds) => {
   if (!stationIds.length) return {};
   const rows = await prisma.review.findMany({
     where: { stationId: { in: stationIds } },
-    select: { stationId: true, rating: true }
+    select: { stationId: true, rating: true },
   });
   const acc = {};
   for (const r of rows) {
@@ -18,7 +18,7 @@ export const ratingStatsFor = async (stationIds) => {
   return Object.fromEntries(
     Object.entries(acc).map(([id, { sum, count }]) => [
       id,
-      { ratingAvg: Math.round((sum / count) * 10) / 10, ratingCount: count }
+      { ratingAvg: Math.round((sum / count) * 10) / 10, ratingCount: count },
     ])
   );
 };
@@ -43,20 +43,21 @@ export const upsertReview = async (req, res, next) => {
     const paid = await prisma.payment.findFirst({
       where: {
         userId: req.user.id,
-        booking: { status: 'COMPLETED', slot: { stationId } }
+        booking: { status: 'COMPLETED', slot: { stationId } },
       },
-      select: { id: true }
+      select: { id: true },
     });
     if (!paid) {
       return res.status(403).json({
         success: false,
-        message: 'You can only review stations where you have completed and paid for a charging session.'
+        message:
+          'You can only review stations where you have completed and paid for a charging session.',
       });
     }
 
     const data = { rating: parseInt(rating), comment: comment?.trim() || null };
     const existing = await prisma.review.findFirst({
-      where: { userId: req.user.id, stationId }
+      where: { userId: req.user.id, stationId },
     });
 
     const review = existing
@@ -68,12 +69,17 @@ export const upsertReview = async (req, res, next) => {
     res.status(existing ? 200 : 201).json({
       success: true,
       message: existing ? 'Review updated' : 'Review posted — thanks for the feedback!',
-      data: { review, stats }
+      data: { review, stats },
     });
   } catch (error) {
     // Compound-unique race (two simultaneous first reviews) surfaces as P2002.
     if (error.code === 'P2002') {
-      return res.status(409).json({ success: false, message: 'You already have a review for this station — try again to edit it.' });
+      return res
+        .status(409)
+        .json({
+          success: false,
+          message: 'You already have a review for this station — try again to edit it.',
+        });
     }
     next(error);
   }
@@ -90,15 +96,15 @@ export const getStationReviews = async (req, res, next) => {
         where: { stationId },
         orderBy: { createdAt: 'desc' },
         take,
-        include: { user: { select: { id: true, name: true, avatar: true } } }
+        include: { user: { select: { id: true, name: true, avatar: true } } },
       }),
-      ratingStatsFor([stationId])
+      ratingStatsFor([stationId]),
     ]);
 
     res.json({
       success: true,
       data: reviews,
-      stats: stats[stationId] || { ratingAvg: 0, ratingCount: 0 }
+      stats: stats[stationId] || { ratingAvg: 0, ratingCount: 0 },
     });
   } catch (error) {
     next(error);
@@ -121,7 +127,11 @@ export const deleteReview = async (req, res, next) => {
     await prisma.review.delete({ where: { id: req.params.id } });
 
     if (isAdmin && !isOwner) {
-      audit(req, 'REVIEW_DELETED', `Moderated a ${review.rating}★ review on station ${review.stationId}`);
+      audit(
+        req,
+        'REVIEW_DELETED',
+        `Moderated a ${review.rating}★ review on station ${review.stationId}`
+      );
     }
 
     res.json({ success: true, message: 'Review deleted' });

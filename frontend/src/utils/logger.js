@@ -12,9 +12,15 @@
 const isDev = import.meta.env.DEV;
 
 export const logger = {
-  error: (...args) => { if (isDev) console.error('[ChargeEV]', ...args); },
-  warn: (...args) => { if (isDev) console.warn('[ChargeEV]', ...args); },
-  info: (...args) => { if (isDev) console.info('[ChargeEV]', ...args); },
+  error: (...args) => {
+    if (isDev) console.error('[ChargeEV]', ...args);
+  },
+  warn: (...args) => {
+    if (isDev) console.warn('[ChargeEV]', ...args);
+  },
+  info: (...args) => {
+    if (isDev) console.info('[ChargeEV]', ...args);
+  },
 };
 
 export default logger;

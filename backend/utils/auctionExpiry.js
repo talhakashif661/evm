@@ -13,8 +13,8 @@ export const expireEndedAuctions = async () => {
     where: { auctionOpen: true, auctionEnd: { lt: new Date() } },
     include: {
       station: true,
-      bids: { where: { status: 'PENDING' }, include: { user: true } }
-    }
+      bids: { where: { status: 'PENDING' }, include: { user: true } },
+    },
   });
 
   for (const slot of ended) {

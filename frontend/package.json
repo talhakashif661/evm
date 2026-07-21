@@ -9,6 +9,8 @@
     "build": "vite build",
     "build:analyze": "cross-env ANALYZE=true vite build",
     "lint": "eslint .",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\" --ignore-path ../.gitignore",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css}\" --ignore-path ../.gitignore",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -39,10 +41,12 @@
     "@vitejs/plugin-react": "^4.2.1",
     "cross-env": "^10.1.0",
     "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "prettier": "^3.9.6",
     "rollup-plugin-visualizer": "^7.0.1",
     "vite": "^5.1.6"
   }

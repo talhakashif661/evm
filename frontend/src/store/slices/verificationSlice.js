@@ -9,40 +9,51 @@ export const sendOTP = createAsyncThunk('verification/sendOTP', async (_, { reje
   } catch (err) {
     return rejectWithValue({
       message: err.response?.data?.message || 'Failed to send verification email',
-      secondsLeft: err.response?.data?.secondsLeft
+      secondsLeft: err.response?.data?.secondsLeft,
     });
   }
 });
 
-export const verifyOTP = createAsyncThunk('verification/verifyOTP', async (otp, { rejectWithValue }) => {
-  try {
-    const res = await api.post('/auth/verify-otp', { otp });
-    return res.data;
-  } catch (err) {
-    return rejectWithValue({ message: err.response?.data?.message || 'Invalid verification code' });
+export const verifyOTP = createAsyncThunk(
+  'verification/verifyOTP',
+  async (otp, { rejectWithValue }) => {
+    try {
+      const res = await api.post('/auth/verify-otp', { otp });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue({
+        message: err.response?.data?.message || 'Invalid verification code',
+      });
+    }
   }
-});
+);
 
-export const resendOTP = createAsyncThunk('verification/resendOTP', async (_, { rejectWithValue }) => {
-  try {
-    const res = await api.post('/auth/resend-otp');
-    return res.data;
-  } catch (err) {
-    return rejectWithValue({
-      message: err.response?.data?.message || 'Failed to resend code',
-      secondsLeft: err.response?.data?.secondsLeft
-    });
+export const resendOTP = createAsyncThunk(
+  'verification/resendOTP',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.post('/auth/resend-otp');
+      return res.data;
+    } catch (err) {
+      return rejectWithValue({
+        message: err.response?.data?.message || 'Failed to resend code',
+        secondsLeft: err.response?.data?.secondsLeft,
+      });
+    }
   }
-});
+);
 
-export const getVerificationStatus = createAsyncThunk('verification/getStatus', async (_, { rejectWithValue }) => {
-  try {
-    const res = await api.get('/auth/verification-status');
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const getVerificationStatus = createAsyncThunk(
+  'verification/getStatus',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.get('/auth/verification-status');
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
 const verificationSlice = createSlice({
   name: 'verification',
@@ -51,7 +62,7 @@ const verificationSlice = createSlice({
     loading: false,
     error: null,
     otpSent: false,
-    resendCooldown: 0
+    resendCooldown: 0,
   },
   reducers: {
     startCooldown: (state, action) => {
@@ -63,11 +74,14 @@ const verificationSlice = createSlice({
     resetState: (state) => {
       state.error = null;
       state.otpSent = false;
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(sendOTP.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(sendOTP.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(sendOTP.fulfilled, (state) => {
         state.loading = false;
         state.otpSent = true;
@@ -83,7 +97,10 @@ const verificationSlice = createSlice({
         if (action.payload.secondsLeft) state.resendCooldown = action.payload.secondsLeft;
         toast.error(action.payload.message);
       })
-      .addCase(verifyOTP.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(verifyOTP.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(verifyOTP.fulfilled, (state) => {
         state.loading = false;
         state.isVerified = true;
@@ -94,7 +111,9 @@ const verificationSlice = createSlice({
         state.error = action.payload.message;
         toast.error(action.payload.message);
       })
-      .addCase(resendOTP.pending, (state) => { state.loading = true; })
+      .addCase(resendOTP.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(resendOTP.fulfilled, (state) => {
         state.loading = false;
         state.resendCooldown = 60;
@@ -109,7 +128,7 @@ const verificationSlice = createSlice({
       .addCase(getVerificationStatus.fulfilled, (state, action) => {
         state.isVerified = action.payload.data.isVerified;
       });
-  }
+  },
 });
 
 export const { startCooldown, tickCooldown, resetState } = verificationSlice.actions;

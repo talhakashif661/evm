@@ -16,7 +16,7 @@ export const requireVerified = () => {
       return res.status(403).json({
         success: false,
         message: 'Email verification required. Please verify your email first.',
-        error: 'EMAIL_NOT_VERIFIED'
+        error: 'EMAIL_NOT_VERIFIED',
       });
     }
 

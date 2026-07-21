@@ -9,8 +9,13 @@ import { clearCacheByPrefix } from '../utils/simpleCache.js';
 export const getDashboardStats = async (req, res, next) => {
   try {
     const [
-      totalUsers, totalStations, totalBookings, totalRevenue,
-      activeBookings, pendingStations, totalBids
+      totalUsers,
+      totalStations,
+      totalBookings,
+      totalRevenue,
+      activeBookings,
+      pendingStations,
+      totalBids,
     ] = await Promise.all([
       prisma.user.count({ where: { role: 'EV_USER' } }),
       prisma.chargingStation.count({ where: { status: 'APPROVED' } }),
@@ -23,11 +28,11 @@ export const getDashboardStats = async (req, res, next) => {
         where: {
           status: { in: ['CONFIRMED', 'ACTIVE'] },
           startTime: { lte: new Date() },
-          OR: [{ plannedEndTime: null }, { plannedEndTime: { gt: new Date() } }]
-        }
+          OR: [{ plannedEndTime: null }, { plannedEndTime: { gt: new Date() } }],
+        },
       }),
       prisma.chargingStation.count({ where: { status: 'PENDING' } }),
-      prisma.bid.count()
+      prisma.bid.count(),
     ]);
 
     // Recent activity
@@ -36,8 +41,8 @@ export const getDashboardStats = async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { name: true, email: true } },
-        slot: { include: { station: { select: { name: true } } } }
-      }
+        slot: { include: { station: { select: { name: true } } } },
+      },
     });
 
     // Monthly bookings for chart
@@ -57,21 +62,21 @@ export const getDashboardStats = async (req, res, next) => {
 
     const bookingsInRange = await prisma.booking.findMany({
       where: { createdAt: { gte: rangeStart } },
-      select: { createdAt: true }
+      select: { createdAt: true },
     });
 
     const countsByKey = {};
-    bookingsInRange.forEach(b => {
+    bookingsInRange.forEach((b) => {
       const d = new Date(b.createdAt);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       countsByKey[key] = (countsByKey[key] || 0) + 1;
     });
 
-    const chartData = last6Months.map(m => ({
+    const chartData = last6Months.map((m) => ({
       name: m.month,
       month: m.month,
       year: m.year,
-      bookings: countsByKey[`${m.year}-${m.date.getMonth()}`] || 0
+      bookings: countsByKey[`${m.year}-${m.date.getMonth()}`] || 0,
     }));
 
     res.json({
@@ -84,11 +89,11 @@ export const getDashboardStats = async (req, res, next) => {
           totalRevenue: totalRevenue._sum.totalRevenue || 0,
           activeBookings,
           pendingStations,
-          totalBids
+          totalBids,
         },
         recentBookings,
-        chartData
-      }
+        chartData,
+      },
     });
   } catch (error) {
     next(error);
@@ -106,30 +111,36 @@ export const getAllUsers = async (req, res, next) => {
       ...(search && {
         OR: [
           { name: { contains: escapeRegex(search), mode: 'insensitive' } },
-          { email: { contains: escapeRegex(search), mode: 'insensitive' } }
-        ]
-      })
+          { email: { contains: escapeRegex(search), mode: 'insensitive' } },
+        ],
+      }),
     };
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
         select: {
-          id: true, name: true, email: true, role: true,
-          isBlocked: true, isVerified: true, phone: true, createdAt: true,
-          _count: { select: { bookings: true, evs: true } }
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isBlocked: true,
+          isVerified: true,
+          phone: true,
+          createdAt: true,
+          _count: { select: { bookings: true, evs: true } },
         },
         skip,
         take,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       }),
-      prisma.user.count({ where })
+      prisma.user.count({ where }),
     ]);
 
     res.json({
       success: true,
       data: users,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) }
+      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
     });
   } catch (error) {
     next(error);
@@ -142,13 +153,21 @@ export const blockUser = async (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { id } });
 
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.role === 'ADMIN') return res.status(400).json({ success: false, message: 'Cannot block admin' });
+    if (user.role === 'ADMIN')
+      return res.status(400).json({ success: false, message: 'Cannot block admin' });
 
     await prisma.user.update({ where: { id }, data: { isBlocked: !user.isBlocked } });
 
-    audit(req, user.isBlocked ? 'USER_UNBLOCKED' : 'USER_BLOCKED', `${user.isBlocked ? 'Unblocked' : 'Blocked'} ${user.email}`);
+    audit(
+      req,
+      user.isBlocked ? 'USER_UNBLOCKED' : 'USER_BLOCKED',
+      `${user.isBlocked ? 'Unblocked' : 'Blocked'} ${user.email}`
+    );
 
-    res.json({ success: true, message: `User ${user.isBlocked ? 'unblocked' : 'blocked'} successfully` });
+    res.json({
+      success: true,
+      message: `User ${user.isBlocked ? 'unblocked' : 'blocked'} successfully`,
+    });
   } catch (error) {
     next(error);
   }
@@ -160,7 +179,8 @@ export const deleteUser = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.role === 'ADMIN') return res.status(400).json({ success: false, message: 'Cannot delete admin' });
+    if (user.role === 'ADMIN')
+      return res.status(400).json({ success: false, message: 'Cannot delete admin' });
 
     // Mirrors the same active-booking guard deleteEV/deleteSlot already have.
     // Without it, deleting a user cascades away (schema onDelete: Cascade)
@@ -168,20 +188,23 @@ export const deleteUser = async (req, res, next) => {
     // customer's live/paid booking at their station — with no refund and no
     // notification, unlike every other cancellation path in this app.
     const ownActiveBooking = await prisma.booking.findFirst({
-      where: { userId: user.id, status: { in: LIVE_BOOKING_STATUSES } }
+      where: { userId: user.id, status: { in: LIVE_BOOKING_STATUSES } },
     });
     if (ownActiveBooking) {
-      return res.status(409).json({ success: false, message: 'This user has an active booking. Cancel it first.' });
+      return res
+        .status(409)
+        .json({ success: false, message: 'This user has an active booking. Cancel it first.' });
     }
 
     if (user.role === 'STATION_OWNER') {
       const stationActiveBooking = await prisma.booking.findFirst({
-        where: { slot: { station: { ownerId: user.id } }, status: { in: LIVE_BOOKING_STATUSES } }
+        where: { slot: { station: { ownerId: user.id } }, status: { in: LIVE_BOOKING_STATUSES } },
       });
       if (stationActiveBooking) {
         return res.status(409).json({
           success: false,
-          message: "This owner's station has active customer bookings. Cancel or complete them first — deleting now would leave those customers unrefunded."
+          message:
+            "This owner's station has active customer bookings. Cancel or complete them first — deleting now would leave those customers unrefunded.",
         });
       }
     }
@@ -204,12 +227,13 @@ export const promoteToAdmin = async (req, res, next) => {
     const { id } = req.params;
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.role === 'ADMIN') return res.status(400).json({ success: false, message: 'User is already an admin' });
+    if (user.role === 'ADMIN')
+      return res.status(400).json({ success: false, message: 'User is already an admin' });
 
     const updated = await prisma.user.update({
       where: { id },
       data: { role: 'ADMIN' },
-      select: { id: true, name: true, email: true, role: true }
+      select: { id: true, name: true, email: true, role: true },
     });
 
     audit(req, 'USER_PROMOTED_ADMIN', `Promoted ${updated.email} to ADMIN`);
@@ -233,19 +257,19 @@ export const getAllStations = async (req, res, next) => {
         where,
         include: {
           owner: { select: { name: true, email: true, phone: true } },
-          _count: { select: { slots: true } }
+          _count: { select: { slots: true } },
         },
         skip,
         take,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       }),
-      prisma.chargingStation.count({ where })
+      prisma.chargingStation.count({ where }),
     ]);
 
     res.json({
       success: true,
       data: stations,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) }
+      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
     });
   } catch (error) {
     next(error);
@@ -258,13 +282,15 @@ export const approveStation = async (req, res, next) => {
     const { action } = req.body; // 'APPROVED' or 'REJECTED'
 
     if (!['APPROVED', 'REJECTED'].includes(action)) {
-      return res.status(400).json({ success: false, message: 'Action must be APPROVED or REJECTED' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Action must be APPROVED or REJECTED' });
     }
 
     const station = await prisma.chargingStation.update({
       where: { id },
       data: { status: action },
-      include: { owner: true }
+      include: { owner: true },
     });
 
     // Approval and rejection are now symmetric — rejection used to notify
@@ -277,10 +303,16 @@ export const approveStation = async (req, res, next) => {
       const { subject, html } = emailTemplates.stationRejected(station.owner.name, station.name);
       sendEmail({ to: station.owner.email, subject, html });
     }
-    getIO()?.to(`user:${station.ownerId}`).emit('station:status-changed', { stationId: station.id, status: action });
+    getIO()
+      ?.to(`user:${station.ownerId}`)
+      .emit('station:status-changed', { stationId: station.id, status: action });
     clearCacheByPrefix('stations:list:'); // a newly-APPROVED station must show up immediately, not after the TTL
 
-    audit(req, `STATION_${action}`, `${action === 'APPROVED' ? 'Approved' : 'Rejected'} station "${station.name}" (owner ${station.owner.email})`);
+    audit(
+      req,
+      `STATION_${action}`,
+      `${action === 'APPROVED' ? 'Approved' : 'Rejected'} station "${station.name}" (owner ${station.owner.email})`
+    );
 
     res.json({ success: true, message: `Station ${action.toLowerCase()}`, data: station });
   } catch (error) {
@@ -302,19 +334,19 @@ export const getAllBookings = async (req, res, next) => {
           user: { select: { name: true, email: true } },
           ev: { select: { model: true } },
           slot: { include: { station: { select: { name: true, city: true } } } },
-          payment: true
+          payment: true,
         },
         skip,
         take,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       }),
-      prisma.booking.count()
+      prisma.booking.count(),
     ]);
 
     res.json({
       success: true,
       data: bookings,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) }
+      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
     });
   } catch (error) {
     next(error);
@@ -332,22 +364,22 @@ export const getAuditLogs = async (req, res, next) => {
 
     const [logs, total] = await Promise.all([
       prisma.log.findMany({ orderBy: { createdAt: 'desc' }, skip, take }),
-      prisma.log.count()
+      prisma.log.count(),
     ]);
 
-    const actorIds = [...new Set(logs.map(l => l.userId).filter(Boolean))];
+    const actorIds = [...new Set(logs.map((l) => l.userId).filter(Boolean))];
     const actors = actorIds.length
       ? await prisma.user.findMany({
           where: { id: { in: actorIds } },
-          select: { id: true, name: true, email: true }
+          select: { id: true, name: true, email: true },
         })
       : [];
-    const actorById = Object.fromEntries(actors.map(a => [a.id, a]));
+    const actorById = Object.fromEntries(actors.map((a) => [a.id, a]));
 
     res.json({
       success: true,
-      data: logs.map(l => ({ ...l, actor: l.userId ? actorById[l.userId] || null : null })),
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) }
+      data: logs.map((l) => ({ ...l, actor: l.userId ? actorById[l.userId] || null : null })),
+      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
     });
   } catch (error) {
     next(error);

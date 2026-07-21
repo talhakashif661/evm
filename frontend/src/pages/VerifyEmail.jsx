@@ -94,8 +94,20 @@ export default function VerifyEmail() {
   if (success) {
     return (
       <div style={{ maxWidth: 420, margin: '64px auto', padding: '0 16px', textAlign: 'center' }}>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}><CheckCircle2 size={48} color="var(--success)" strokeWidth={1.5} /></div>
-        <h1 style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.9rem', letterSpacing: '0.02em', color: 'var(--text-primary)' }}>Email Verified!</h1>
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+          <CheckCircle2 size={48} color="var(--success)" strokeWidth={1.5} />
+        </div>
+        <h1
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 700,
+            fontSize: '1.9rem',
+            letterSpacing: '0.02em',
+            color: 'var(--text-primary)',
+          }}
+        >
+          Email Verified!
+        </h1>
         <p style={{ color: 'var(--text-muted)' }}>Redirecting to your dashboard...</p>
       </div>
     );
@@ -103,15 +115,31 @@ export default function VerifyEmail() {
 
   return (
     <div style={{ maxWidth: 420, margin: '64px auto', padding: '0 16px' }}>
-      <SEO title="Verify Your Email" description="Verify your email address to unlock all ChargeEV features." noIndex />
-      <div style={{
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 6,
-        padding: 32,
-        textAlign: 'center'
-      }}>
-        <h1 style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '1.9rem', letterSpacing: '0.02em', marginBottom: 10 }}>Verify your email</h1>
+      <SEO
+        title="Verify Your Email"
+        description="Verify your email address to unlock all ChargeEV features."
+        noIndex
+      />
+      <div
+        style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: 32,
+          textAlign: 'center',
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 700,
+            fontSize: '1.9rem',
+            letterSpacing: '0.02em',
+            marginBottom: 10,
+          }}
+        >
+          Verify your email
+        </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: 24, fontSize: 14 }}>
           We sent a 6-digit code to <strong>{user?.email}</strong>
         </p>
@@ -131,9 +159,14 @@ export default function VerifyEmail() {
                 inputMode="numeric"
                 maxLength={1}
                 style={{
-                  width: 44, height: 52, textAlign: 'center', fontSize: 22,
-                  borderRadius: 4, border: '1.5px solid var(--border)',
-                  background: 'var(--bg-surface)', color: 'var(--text-primary)'
+                  width: 44,
+                  height: 52,
+                  textAlign: 'center',
+                  fontSize: 22,
+                  borderRadius: 4,
+                  border: '1.5px solid var(--border)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
                 }}
               />
             ))}
@@ -143,9 +176,16 @@ export default function VerifyEmail() {
             type="submit"
             disabled={loading || digits.join('').length !== 6}
             style={{
-              width: '100%', padding: '12px', borderRadius: 4, border: 'none',
-              background: 'var(--primary)', color: '#fff', fontFamily: 'Inter', fontWeight: 700, cursor: 'pointer',
-              opacity: (loading || digits.join('').length !== 6) ? 0.6 : 1
+              width: '100%',
+              padding: '12px',
+              borderRadius: 4,
+              border: 'none',
+              background: 'var(--primary)',
+              color: '#fff',
+              fontFamily: 'Inter',
+              fontWeight: 700,
+              cursor: 'pointer',
+              opacity: loading || digits.join('').length !== 6 ? 0.6 : 1,
             }}
           >
             {loading ? 'Verifying...' : 'Verify Email'}
@@ -156,9 +196,12 @@ export default function VerifyEmail() {
           onClick={handleResend}
           disabled={resendCooldown > 0 || loading}
           style={{
-            marginTop: 16, background: 'none', border: 'none',
+            marginTop: 16,
+            background: 'none',
+            border: 'none',
             color: resendCooldown > 0 ? 'var(--text-muted)' : 'var(--primary)',
-            cursor: resendCooldown > 0 ? 'default' : 'pointer', fontSize: 14
+            cursor: resendCooldown > 0 ? 'default' : 'pointer',
+            fontSize: 14,
           }}
         >
           {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}

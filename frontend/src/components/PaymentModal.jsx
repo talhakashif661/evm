@@ -10,9 +10,13 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 
 
 const cardElementOptions = {
   style: {
-    base: { fontSize: '16px', color: 'var(--text-primary)', '::placeholder': { color: 'var(--text-muted)' } },
-    invalid: { color: 'var(--danger)' }
-  }
+    base: {
+      fontSize: '16px',
+      color: 'var(--text-primary)',
+      '::placeholder': { color: 'var(--text-muted)' },
+    },
+    invalid: { color: 'var(--danger)' },
+  },
 };
 
 function CheckoutForm({ clientSecret, amount, onSuccess, onClose }) {
@@ -28,7 +32,7 @@ function CheckoutForm({ clientSecret, amount, onSuccess, onClose }) {
     setError(null);
 
     const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: { card: elements.getElement(CardElement) }
+      payment_method: { card: elements.getElement(CardElement) },
     });
 
     if (stripeError) {
@@ -48,15 +52,33 @@ function CheckoutForm({ clientSecret, amount, onSuccess, onClose }) {
       <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 16 }}>
         Amount due: <strong style={{ color: 'var(--gold)' }}>{toPKR(amount)}</strong>
       </p>
-      <div className="mb-3" style={{ padding: 14, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-elevated)' }}>
+      <div
+        className="mb-3"
+        style={{
+          padding: 14,
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          background: 'var(--bg-elevated)',
+        }}
+      >
         <CardElement options={cardElementOptions} />
       </div>
-      {error && <p style={{ color: 'var(--danger)', fontSize: '0.82rem', marginBottom: 12 }}>{error}</p>}
+      {error && (
+        <p style={{ color: 'var(--danger)', fontSize: '0.82rem', marginBottom: 12 }}>{error}</p>
+      )}
       <button
         type="submit"
         className="btn-gold"
         disabled={!stripe || submitting}
-        style={{ width: '100%', padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: submitting ? 0.7 : 1 }}
+        style={{
+          width: '100%',
+          padding: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          opacity: submitting ? 0.7 : 1,
+        }}
       >
         <Lock size={15} /> {submitting ? 'Processing...' : `Pay ${toPKR(amount)}`}
       </button>
@@ -75,7 +97,10 @@ function MockPaymentPanel({ amount, onSuccess }) {
   useEffect(() => {
     const confirmTimer = setTimeout(() => setConfirmed(true), 500);
     const closeTimer = setTimeout(() => onSuccess(), 1200);
-    return () => { clearTimeout(confirmTimer); clearTimeout(closeTimer); };
+    return () => {
+      clearTimeout(confirmTimer);
+      clearTimeout(closeTimer);
+    };
   }, [onSuccess]);
 
   return (
@@ -83,11 +108,18 @@ function MockPaymentPanel({ amount, onSuccess }) {
       <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 16 }}>
         Amount due: <strong style={{ color: 'var(--gold)' }}>{toPKR(amount)}</strong>
       </p>
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-        padding: '20px 14px', border: '1px dashed var(--border)', borderRadius: 8,
-        background: 'var(--bg-elevated)'
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 10,
+          padding: '20px 14px',
+          border: '1px dashed var(--border)',
+          borderRadius: 8,
+          background: 'var(--bg-elevated)',
+        }}
+      >
         <Zap size={22} color="var(--gold)" />
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>
           {confirmed ? 'Mock payment confirmed' : 'Simulating payment (local development mode)...'}
@@ -112,10 +144,17 @@ export default function PaymentModal({ show, onClose, clientSecret, amount, mock
         <MockPaymentPanel amount={amount} onSuccess={onSuccess} />
       ) : clientSecret ? (
         <Elements stripe={stripePromise} options={{ clientSecret }}>
-          <CheckoutForm clientSecret={clientSecret} amount={amount} onSuccess={onSuccess} onClose={onClose} />
+          <CheckoutForm
+            clientSecret={clientSecret}
+            amount={amount}
+            onSuccess={onSuccess}
+            onClose={onClose}
+          />
         </Elements>
       ) : (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}><div className="ev-spinner" /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
+          <div className="ev-spinner" />
+        </div>
       )}
     </Modal>
   );

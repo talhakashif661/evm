@@ -33,14 +33,14 @@ export const createComplaint = async (req, res, next) => {
         email: email.trim().toLowerCase(),
         phone: phone?.trim() || null,
         subject: subject.trim(),
-        message: message.trim()
-      }
+        message: message.trim(),
+      },
     });
 
     res.status(201).json({
       success: true,
       message: 'Complaint received — the admin team will get back to you.',
-      data: complaint
+      data: complaint,
     });
   } catch (error) {
     next(error);
@@ -56,13 +56,13 @@ export const getComplaints = async (req, res, next) => {
 
     const [complaints, total] = await Promise.all([
       prisma.complaint.findMany({ orderBy: { createdAt: 'desc' }, skip, take }),
-      prisma.complaint.count()
+      prisma.complaint.count(),
     ]);
 
     res.json({
       success: true,
       data: complaints,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) }
+      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
     });
   } catch (error) {
     next(error);
@@ -79,7 +79,11 @@ export const deleteComplaint = async (req, res, next) => {
 
     await prisma.complaint.delete({ where: { id: req.params.id } });
 
-    audit(req, 'COMPLAINT_DELETED', `Deleted complaint "${complaint.subject}" from ${complaint.email}`);
+    audit(
+      req,
+      'COMPLAINT_DELETED',
+      `Deleted complaint "${complaint.subject}" from ${complaint.email}`
+    );
 
     res.json({ success: true, message: 'Complaint deleted' });
   } catch (error) {

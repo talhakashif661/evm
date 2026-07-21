@@ -24,4 +24,4 @@
 const DEFAULT_TTL_MS = 30_000;
 
 export const isFresh = (lastFetchedAt, ttlMs = DEFAULT_TTL_MS) =>
-  !!lastFetchedAt && (Date.now() - lastFetchedAt) < ttlMs;
+  !!lastFetchedAt && Date.now() - lastFetchedAt < ttlMs;

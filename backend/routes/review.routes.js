@@ -13,7 +13,15 @@ router.get('/station/:stationId', getStationReviews);
 
 // Writing requires a verified EV user; the controller additionally enforces
 // the verified-purchase rule (completed + paid session at that station).
-router.post('/', authenticate, authorize('EV_USER'), requireVerified(), createReviewRules, validate, upsertReview);
+router.post(
+  '/',
+  authenticate,
+  authorize('EV_USER'),
+  requireVerified(),
+  createReviewRules,
+  validate,
+  upsertReview
+);
 
 // Author can delete their own; admin can moderate any (audited).
 router.delete('/:id', authenticate, deleteReview);

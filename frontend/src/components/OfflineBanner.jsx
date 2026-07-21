@@ -26,13 +26,25 @@ export default function OfflineBanner() {
     <div
       role="status"
       style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 2000,
-        background: 'var(--error)', color: '#FDF8F0', textAlign: 'center',
-        padding: '9px 16px', fontSize: '0.85rem', fontWeight: 600,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 2000,
+        background: 'var(--error)',
+        color: '#FDF8F0',
+        textAlign: 'center',
+        padding: '9px 16px',
+        fontSize: '0.85rem',
+        fontWeight: 600,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
       }}
     >
-      <WifiOff size={16} /> You&apos;re offline — actions like booking or bidding won&apos;t go through until your connection is back.
+      <WifiOff size={16} /> You&apos;re offline — actions like booking or bidding won&apos;t go
+      through until your connection is back.
     </div>
   );
 }

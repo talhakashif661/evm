@@ -16,7 +16,9 @@ dotenv.config();
 const REQUIRED_ENV_VARS = ['DATABASE_URL', 'JWT_SECRET'];
 const missingEnvVars = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
 if (missingEnvVars.length > 0) {
-  logger.error(`Missing required environment variable(s): ${missingEnvVars.join(', ')}. See .env.example.`);
+  logger.error(
+    `Missing required environment variable(s): ${missingEnvVars.join(', ')}. See .env.example.`
+  );
   process.exit(1);
 }
 
@@ -37,8 +39,12 @@ initSocket(httpServer, getAllowedOrigins());
 let sweepInterval = null;
 if (process.env.NODE_ENV !== 'test') {
   sweepInterval = setInterval(() => {
-    expireNoShowBookings().catch((err) => logger.error('expireNoShowBookings failed:', err.message));
-    expirePaymentTimeouts().catch((err) => logger.error('expirePaymentTimeouts failed:', err.message));
+    expireNoShowBookings().catch((err) =>
+      logger.error('expireNoShowBookings failed:', err.message)
+    );
+    expirePaymentTimeouts().catch((err) =>
+      logger.error('expirePaymentTimeouts failed:', err.message)
+    );
     // Auctions used to only ever close when the owner manually clicked
     // "Close Auction" — one whose deadline passed unattended stayed stuck
     // open forever. This resolves it the same way the manual close does.

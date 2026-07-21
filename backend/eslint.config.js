@@ -1,5 +1,6 @@
-import js from '@eslint/js'
-import globals from 'globals'
+import js from '@eslint/js';
+import globals from 'globals';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 // Plain Node.js ES modules setup — no React/JSX concerns here, unlike the
 // frontend config. Flat config, matching ESLint v9's default.
@@ -29,4 +30,7 @@ export default [
       // deliberate uses exist (server.js's startup banner, for one).
     },
   },
-]
+  // Must be last: turns off any ESLint stylistic rules that would otherwise
+  // conflict with Prettier's own formatting (added in Phase 8.2 Prettier setup).
+  eslintConfigPrettier,
+];

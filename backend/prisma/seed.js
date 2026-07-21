@@ -20,8 +20,8 @@ async function main() {
       password: ownerPass,
       role: 'STATION_OWNER',
       isVerified: true,
-      phone: '+1-555-100-0001'
-    }
+      phone: '+1-555-100-0001',
+    },
   });
 
   const owner2 = await prisma.user.upsert({
@@ -33,8 +33,8 @@ async function main() {
       password: ownerPass,
       role: 'STATION_OWNER',
       isVerified: true,
-      phone: '+1-555-100-0002'
-    }
+      phone: '+1-555-100-0002',
+    },
   });
   console.log('✅ Station owners created');
 
@@ -48,8 +48,8 @@ async function main() {
       email: 'alice@example.com',
       password: userPass,
       role: 'EV_USER',
-      phone: '+1-555-200-0001'
-    }
+      phone: '+1-555-200-0001',
+    },
   });
 
   const user2 = await prisma.user.upsert({
@@ -60,8 +60,8 @@ async function main() {
       email: 'bob@example.com',
       password: userPass,
       role: 'EV_USER',
-      phone: '+1-555-200-0002'
-    }
+      phone: '+1-555-200-0002',
+    },
   });
   console.log('✅ EV users created');
 
@@ -75,11 +75,11 @@ async function main() {
       address: '123 Main Street',
       city: 'New York',
       latitude: 40.7128,
-      longitude: -74.0060,
+      longitude: -74.006,
       status: 'APPROVED',
       pricePerKwh: 40,
-      totalRevenue: 245075
-    }
+      totalRevenue: 245075,
+    },
   });
 
   const station2 = await prisma.chargingStation.upsert({
@@ -94,8 +94,8 @@ async function main() {
       longitude: -73.9776,
       status: 'APPROVED',
       pricePerKwh: 32,
-      totalRevenue: 182050
-    }
+      totalRevenue: 182050,
+    },
   });
   console.log('✅ Stations created');
 
@@ -104,7 +104,14 @@ async function main() {
     { stationId: station1.id, slotNumber: 1, powerKw: 50, status: 'AVAILABLE' },
     { stationId: station1.id, slotNumber: 2, powerKw: 50, status: 'OCCUPIED' },
     { stationId: station1.id, slotNumber: 3, powerKw: 100, status: 'AVAILABLE' },
-    { stationId: station1.id, slotNumber: 4, powerKw: 22, status: 'AVAILABLE', auctionOpen: true, auctionEnd: new Date(Date.now() + 3600000) },
+    {
+      stationId: station1.id,
+      slotNumber: 4,
+      powerKw: 22,
+      status: 'AVAILABLE',
+      auctionOpen: true,
+      auctionEnd: new Date(Date.now() + 3600000),
+    },
   ];
 
   const slotsData2 = [
@@ -116,7 +123,7 @@ async function main() {
   const createdSlots = [];
   for (const s of [...slotsData1, ...slotsData2]) {
     const existing = await prisma.slot.findFirst({
-      where: { stationId: s.stationId, slotNumber: s.slotNumber }
+      where: { stationId: s.stationId, slotNumber: s.slotNumber },
     });
     if (!existing) {
       const slot = await prisma.slot.create({ data: s });
@@ -126,25 +133,29 @@ async function main() {
   console.log('✅ Slots created');
 
   // Create EVs
-  await prisma.eV.create({
-    data: {
-      userId: user1.id,
-      model: 'Tesla Model 3',
-      batteryCapacity: 82,
-      batteryPercentage: 45,
-      licensePlate: 'NY-EV-001'
-    }
-  }).catch(() => null);
+  await prisma.eV
+    .create({
+      data: {
+        userId: user1.id,
+        model: 'Tesla Model 3',
+        batteryCapacity: 82,
+        batteryPercentage: 45,
+        licensePlate: 'NY-EV-001',
+      },
+    })
+    .catch(() => null);
 
-  await prisma.eV.create({
-    data: {
-      userId: user2.id,
-      model: 'Nissan Leaf',
-      batteryCapacity: 40,
-      batteryPercentage: 22,
-      licensePlate: 'NY-EV-002'
-    }
-  }).catch(() => null);
+  await prisma.eV
+    .create({
+      data: {
+        userId: user2.id,
+        model: 'Nissan Leaf',
+        batteryCapacity: 40,
+        batteryPercentage: 22,
+        licensePlate: 'NY-EV-002',
+      },
+    })
+    .catch(() => null);
   console.log('✅ EVs created');
 
   console.log('\n🎉 Seed complete!');

@@ -24,7 +24,12 @@ describe('POST /api/auth/register — validation', () => {
   it('rejects an invalid role', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Jane Doe', email: 'jane@example.com', password: 'password123', role: 'ADMIN' });
+      .send({
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        password: 'password123',
+        role: 'ADMIN',
+      });
     expect(res.status).toBe(400);
   });
 });
@@ -38,9 +43,7 @@ describe('POST /api/auth/login — validation', () => {
   });
 
   it('rejects a missing password', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'jane@example.com' });
+    const res = await request(app).post('/api/auth/login').send({ email: 'jane@example.com' });
     expect(res.status).toBe(400);
   });
 });

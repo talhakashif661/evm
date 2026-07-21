@@ -6,7 +6,7 @@ import { Star } from 'lucide-react';
  * Works by stacking a clipped gold row over a grey base row.
  */
 export function Stars({ value = 0, size = 15, count = null }) {
-  const pct = Math.max(0, Math.min(5, value)) / 5 * 100;
+  const pct = (Math.max(0, Math.min(5, value)) / 5) * 100;
   const row = (fill) => (
     <span style={{ display: 'inline-flex', gap: 2 }}>
       {Array.from({ length: 5 }).map((_, i) => (
@@ -18,7 +18,15 @@ export function Stars({ value = 0, size = 15, count = null }) {
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <span style={{ position: 'relative', display: 'inline-flex', lineHeight: 0 }}>
         {row('#DDD6C8')}
-        <span style={{ position: 'absolute', inset: 0, width: `${pct}%`, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: `${pct}%`,
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {row('#96551A')}
         </span>
       </span>
@@ -35,12 +43,26 @@ export function Stars({ value = 0, size = 15, count = null }) {
 export function StarInput({ value, onChange, size = 28 }) {
   return (
     <div style={{ display: 'flex', gap: 6 }}>
-      {[1, 2, 3, 4, 5].map(n => (
-        <button key={n} type="button" onClick={() => onChange(n)} aria-label={`${n} star${n > 1 ? 's' : ''}`}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, lineHeight: 0 }}>
-          <Star size={size} strokeWidth={1.5}
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          aria-label={`${n} star${n > 1 ? 's' : ''}`}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 2,
+            lineHeight: 0,
+          }}
+        >
+          <Star
+            size={size}
+            strokeWidth={1.5}
             fill={n <= value ? '#96551A' : 'none'}
-            color={n <= value ? '#96551A' : 'var(--text-muted)'} />
+            color={n <= value ? '#96551A' : 'var(--text-muted)'}
+          />
         </button>
       ))}
     </div>

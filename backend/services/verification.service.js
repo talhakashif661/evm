@@ -17,16 +17,25 @@ const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 const otpEmailTemplate = (name, otp) => ({
   subject: 'Verify your ChargeEV account',
   html: html`
-    <div style="font-family:Arial,sans-serif;background:#FDF8F0;color:#4A4A4A;padding:40px;border-radius:12px;max-width:480px;margin:0 auto">
+    <div
+      style="font-family:Arial,sans-serif;background:#FDF8F0;color:#4A4A4A;padding:40px;border-radius:12px;max-width:480px;margin:0 auto"
+    >
       <h1 style="color:#1A1A1A;font-size:20px">Hi ${name},</h1>
-      <p>Use the code below to verify your email address. This code expires in ${OTP_EXPIRY_MINUTES} minutes.</p>
-      <div style="background:#ffffff;padding:24px;border-radius:8px;margin:24px 0;text-align:center">
+      <p>
+        Use the code below to verify your email address. This code expires in ${OTP_EXPIRY_MINUTES}
+        minutes.
+      </p>
+      <div
+        style="background:#ffffff;padding:24px;border-radius:8px;margin:24px 0;text-align:center"
+      >
         <span style="font-size:32px;letter-spacing:8px;font-weight:bold;color:#1A1A1A">${otp}</span>
       </div>
-      <p style="color:#8A8A8A;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
+      <p style="color:#8A8A8A;font-size:13px">
+        If you didn't request this, you can safely ignore this email.
+      </p>
       <p style="color:#8A8A8A;margin-top:20px">The ChargeEV Team</p>
     </div>
-  `
+  `,
 });
 
 /**
@@ -59,8 +68,8 @@ export const sendVerificationOTP = async (userId) => {
     data: {
       verificationOtpHash: otpHash,
       verificationOtpExpiry: expiry,
-      lastOtpSentAt: new Date()
-    }
+      lastOtpSentAt: new Date(),
+    },
   });
 
   const { subject, html } = otpEmailTemplate(user.name, otp);
@@ -107,7 +116,7 @@ export const verifyOTP = async (userId, submittedOtp) => {
     // instant re-block for the rest of time.
     user = await prisma.user.update({
       where: { id: userId },
-      data: { verificationAttempts: 0, verificationBlockedUntil: null }
+      data: { verificationAttempts: 0, verificationBlockedUntil: null },
     });
   }
 
@@ -125,7 +134,9 @@ export const verifyOTP = async (userId, submittedOtp) => {
   if (!isValid) {
     const attempts = user.verificationAttempts + 1;
     const blocked = attempts >= MAX_VERIFICATION_ATTEMPTS;
-    const blockedUntil = blocked ? new Date(now.getTime() + VERIFICATION_BLOCK_HOURS * 60 * 60 * 1000) : null;
+    const blockedUntil = blocked
+      ? new Date(now.getTime() + VERIFICATION_BLOCK_HOURS * 60 * 60 * 1000)
+      : null;
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -133,8 +144,8 @@ export const verifyOTP = async (userId, submittedOtp) => {
         // clean again once VERIFICATION_BLOCK_HOURS has passed.
         verificationAttempts: blocked ? 0 : attempts,
         lastVerificationAttempt: now,
-        verificationBlockedUntil: blockedUntil
-      }
+        verificationBlockedUntil: blockedUntil,
+      },
     });
     return blocked ? { status: 'BLOCKED', blockedUntil } : { status: 'INVALID' };
   }
@@ -147,8 +158,8 @@ export const verifyOTP = async (userId, submittedOtp) => {
       verificationOtpHash: null,
       verificationOtpExpiry: null,
       verificationAttempts: 0,
-      verificationBlockedUntil: null
-    }
+      verificationBlockedUntil: null,
+    },
   });
 
   logger.info(`User ${user.email} verified successfully`);
@@ -158,12 +169,12 @@ export const verifyOTP = async (userId, submittedOtp) => {
 export const getVerificationStatus = async (userId) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { isVerified: true, verifiedAt: true }
+    select: { isVerified: true, verifiedAt: true },
   });
   if (!user) throw new Error('User not found');
 
   return {
     isVerified: user.isVerified,
-    verifiedAt: user.verifiedAt
+    verifiedAt: user.verifiedAt,
   };
 };

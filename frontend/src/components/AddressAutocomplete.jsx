@@ -87,37 +87,70 @@ export default function AddressAutocomplete({ id, value, onChange, onSelect, pla
           autoComplete="off"
         />
         {loading && (
-          <Loader2 size={16} className="spin" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <Loader2
+            size={16}
+            className="spin"
+            style={{
+              position: 'absolute',
+              right: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--text-muted)',
+            }}
+          />
         )}
       </div>
       {open && suggestions.length > 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 8, marginTop: 4, boxShadow: 'var(--shadow-lg)',
-          maxHeight: 220, overflowY: 'auto'
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            marginTop: 4,
+            boxShadow: 'var(--shadow-lg)',
+            maxHeight: 220,
+            overflowY: 'auto',
+          }}
+        >
           {suggestions.map((s) => (
             <button
               key={s.place_id}
               type="button"
               onClick={() => handleSelect(s)}
               style={{
-                display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%',
-                padding: '10px 12px', border: 'none', background: 'none', cursor: 'pointer',
-                textAlign: 'left', fontSize: '0.85rem', color: 'var(--text-primary)',
-                borderBottom: '1px solid var(--border)'
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+                width: '100%',
+                padding: '10px 12px',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontSize: '0.85rem',
+                color: 'var(--text-primary)',
+                borderBottom: '1px solid var(--border)',
               }}
               onMouseDown={(e) => e.preventDefault()}
             >
-              <MapPin size={15} color="var(--accent-gold-dark)" style={{ flexShrink: 0, marginTop: 2 }} />
+              <MapPin
+                size={15}
+                color="var(--accent-gold-dark)"
+                style={{ flexShrink: 0, marginTop: 2 }}
+              />
               <span>{s.display_name}</span>
             </button>
           ))}
         </div>
       )}
       <small style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-        Pick a suggestion to auto-fill city and coordinates, or type your own address and set them manually below.
+        Pick a suggestion to auto-fill city and coordinates, or type your own address and set them
+        manually below.
       </small>
     </div>
   );

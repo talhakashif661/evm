@@ -18,7 +18,7 @@ let io = null;
 //                         server-verified JWT during the handshake instead.
 export function initSocket(httpServer, corsOrigins) {
   io = new Server(httpServer, {
-    cors: { origin: corsOrigins, credentials: true }
+    cors: { origin: corsOrigins, credentials: true },
   });
 
   // A connection with no token, or an invalid/expired one, still connects —
@@ -30,7 +30,10 @@ export function initSocket(httpServer, corsOrigins) {
       try {
         socket.userId = verifyToken(token).id;
       } catch (err) {
-        logger.debug('Socket handshake token invalid/expired — connecting anonymously:', err.message);
+        logger.debug(
+          'Socket handshake token invalid/expired — connecting anonymously:',
+          err.message
+        );
       }
     }
     next();
@@ -39,10 +42,18 @@ export function initSocket(httpServer, corsOrigins) {
   io.on('connection', (socket) => {
     if (socket.userId) socket.join(`user:${socket.userId}`);
 
-    socket.on('join:slot', (slotId) => { if (slotId) socket.join(`slot:${slotId}`); });
-    socket.on('leave:slot', (slotId) => { if (slotId) socket.leave(`slot:${slotId}`); });
-    socket.on('join:station', (stationId) => { if (stationId) socket.join(`station:${stationId}`); });
-    socket.on('leave:station', (stationId) => { if (stationId) socket.leave(`station:${stationId}`); });
+    socket.on('join:slot', (slotId) => {
+      if (slotId) socket.join(`slot:${slotId}`);
+    });
+    socket.on('leave:slot', (slotId) => {
+      if (slotId) socket.leave(`slot:${slotId}`);
+    });
+    socket.on('join:station', (stationId) => {
+      if (stationId) socket.join(`station:${stationId}`);
+    });
+    socket.on('leave:station', (stationId) => {
+      if (stationId) socket.leave(`station:${stationId}`);
+    });
   });
 
   return io;
