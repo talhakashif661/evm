@@ -26,8 +26,11 @@ export default [
       // the pattern rather than the code needing to change for the linter.
       'no-unused-vars': ['warn', { args: 'none', ignoreRestSiblings: true }],
       // This phase separately audits console.* usage directly (see
-      // CHANGELOG.md) rather than banning it here — several legitimate,
-      // deliberate uses exist (server.js's startup banner, for one).
+      // CHANGELOG.md) rather than banning it here. Verified against source:
+      // server.js is actually fully routed through logger.* already (no raw
+      // console calls there) — the genuine, legitimate raw-console uses are
+      // in CLI-only dev tooling that runs outside the app's request
+      // lifecycle: prisma/seed.js and ../scripts/setup-env.mjs.
     },
   },
   // Must be last: turns off any ESLint stylistic rules that would otherwise
