@@ -74,12 +74,10 @@ export const upsertReview = async (req, res, next) => {
   } catch (error) {
     // Compound-unique race (two simultaneous first reviews) surfaces as P2002.
     if (error.code === 'P2002') {
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: 'You already have a review for this station — try again to edit it.',
-        });
+      return res.status(409).json({
+        success: false,
+        message: 'You already have a review for this station — try again to edit it.',
+      });
     }
     next(error);
   }

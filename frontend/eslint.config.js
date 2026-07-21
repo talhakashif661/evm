@@ -1,9 +1,9 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import react from 'eslint-plugin-react'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import eslintConfigPrettier from 'eslint-config-prettier'
+import js from '@eslint/js';
+import globals from 'globals';
+import react from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 // Standard Vite + React setup (matches what `npm create vite -- --template
 // react` scaffolds by default) — flat config, since that's the default as
@@ -48,8 +48,10 @@ export default [
       // a problem. Scoped to just the two rules this project's actual setup
       // benefits from, rather than adopting Compiler-prep rules for a
       // Compiler this app doesn't use.
-      'react-hooks/rules-of-hooks': reactHooks.configs.recommended.rules['react-hooks/rules-of-hooks'],
-      'react-hooks/exhaustive-deps': reactHooks.configs.recommended.rules['react-hooks/exhaustive-deps'],
+      'react-hooks/rules-of-hooks':
+        reactHooks.configs.recommended.rules['react-hooks/rules-of-hooks'],
+      'react-hooks/exhaustive-deps':
+        reactHooks.configs.recommended.rules['react-hooks/exhaustive-deps'],
       'react/react-in-jsx-scope': 'off', // Vite's JSX transform doesn't need React in scope
       'react/prop-types': 'off', // this project uses prop-types selectively (see components/*.jsx), not on every function component
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
@@ -60,4 +62,4 @@ export default [
   // Must be last: turns off any ESLint stylistic rules that would otherwise
   // conflict with Prettier's own formatting (added in Phase 8.2 Prettier setup).
   eslintConfigPrettier,
-]
+];

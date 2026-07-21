@@ -102,12 +102,10 @@ export const createBooking = async (req, res, next) => {
     // window on the same slot is exactly what this feature enables, so only
     // hard physical states block booking outright.
     if (['MAINTENANCE', 'OCCUPIED'].includes(slot.status)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: `Slot is currently ${slot.status.toLowerCase()} — please pick another slot`,
-        });
+      return res.status(400).json({
+        success: false,
+        message: `Slot is currently ${slot.status.toLowerCase()} — please pick another slot`,
+      });
     }
     if (slot.auctionOpen) {
       return res
@@ -171,13 +169,11 @@ export const createBooking = async (req, res, next) => {
       const winnerId = contenders.map((c) => c.id).sort()[0];
       if (booking.id !== winnerId) {
         await prisma.booking.delete({ where: { id: booking.id } });
-        return res
-          .status(409)
-          .json({
-            success: false,
-            message:
-              'That time window was just taken by another booking. Please pick another window.',
-          });
+        return res.status(409).json({
+          success: false,
+          message:
+            'That time window was just taken by another booking. Please pick another window.',
+        });
       }
     }
 
@@ -297,12 +293,10 @@ export const checkIn = async (req, res, next) => {
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
     if (booking.status !== 'CONFIRMED') {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'This booking cannot be checked in from its current state',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'This booking cannot be checked in from its current state',
+      });
     }
 
     // Windowed bookings must be claimed within NO_SHOW_MINUTES of their
@@ -498,12 +492,10 @@ export const completeBooking = async (req, res, next) => {
     // auction-booking fallback and was a real bug: it let an owner skip
     // check-in and payment entirely for ANY booking, not just auction wins.
     if (booking.status !== 'ACTIVE') {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'Booking cannot be completed until it has been paid (status must be ACTIVE)',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Booking cannot be completed until it has been paid (status must be ACTIVE)',
+      });
     }
 
     const endTime = new Date();
@@ -612,13 +604,11 @@ export const ownerCancelBooking = async (req, res, next) => {
     });
     sendEmail({ to: booking.user.email, subject, html });
 
-    getIO()
-      ?.to(`user:${booking.userId}`)
-      .emit('booking:status-changed', {
-        bookingId: booking.id,
-        status: 'CANCELLED',
-        reason: 'OWNER_CANCELLED',
-      });
+    getIO()?.to(`user:${booking.userId}`).emit('booking:status-changed', {
+      bookingId: booking.id,
+      status: 'CANCELLED',
+      reason: 'OWNER_CANCELLED',
+    });
     getIO()
       ?.to(`slot:${booking.slotId}`)
       .emit('slot:availability-changed', { slotId: booking.slotId });

@@ -47,29 +47,23 @@ export const verifyOTP = async (req, res, next) => {
           data: { isVerified: true },
         });
       case 'ALREADY_VERIFIED':
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: 'Your email is already verified.',
-            error: 'ALREADY_VERIFIED',
-          });
+        return res.status(400).json({
+          success: false,
+          message: 'Your email is already verified.',
+          error: 'ALREADY_VERIFIED',
+        });
       case 'NO_OTP_PENDING':
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: 'No verification code found. Please request a new one.',
-            error: 'NO_OTP_PENDING',
-          });
+        return res.status(400).json({
+          success: false,
+          message: 'No verification code found. Please request a new one.',
+          error: 'NO_OTP_PENDING',
+        });
       case 'EXPIRED':
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: 'Verification code expired. Please request a new one.',
-            error: 'OTP_EXPIRED',
-          });
+        return res.status(400).json({
+          success: false,
+          message: 'Verification code expired. Please request a new one.',
+          error: 'OTP_EXPIRED',
+        });
       case 'INVALID':
         return res.status(400).json({
           success: false,

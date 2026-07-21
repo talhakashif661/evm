@@ -337,15 +337,12 @@ describe('E2E: time-window bookings + overlap detection', () => {
       .set(auth(ev2Token))
       .send({ slotId: slot2Id, evId: ev2Id, startTime: past, durationMinutes: 60 });
     expect(r1.status).toBe(400);
-    const r2 = await api()
-      .post('/api/bookings')
-      .set(auth(ev2Token))
-      .send({
-        slotId: slot2Id,
-        evId: ev2Id,
-        startTime: new Date().toISOString(),
-        durationMinutes: 5,
-      });
+    const r2 = await api().post('/api/bookings').set(auth(ev2Token)).send({
+      slotId: slot2Id,
+      evId: ev2Id,
+      startTime: new Date().toISOString(),
+      durationMinutes: 5,
+    });
     expect(r2.status).toBe(400);
   });
 });

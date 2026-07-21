@@ -37,7 +37,7 @@ booking exactly once (idempotent on retry), auctions (priority ranking,
 close, winner booking), and admin audit logs. No real database or network
 access required — see the comment at the top of that file for the full list.
 
-## What's *not* here (and how to add it)
+## What's _not_ here (and how to add it)
 
 Real integration tests against an **actual** MongoDB (not the in-memory
 mock) still don't exist — every current test either fails fast before
@@ -50,7 +50,7 @@ touching Prisma, or swaps it out entirely. To add real DB-backed tests:
    and clean up in `afterAll`.
 3. For true unit tests of a controller in isolation (no DB at all), mock
    `../utils/prisma.js` with `jest.unstable_mockModule` (required for ESM)
-   *before* importing the controller under test — Jest's ESM support means
+   _before_ importing the controller under test — Jest's ESM support means
    the mock has to be registered before the dynamic `import()` that pulls in
    the module you're testing.
 

@@ -232,13 +232,11 @@ export const resolveAuctionForSlot = async (slot) => {
   getIO()
     ?.to(`slot:${slot.id}`)
     .emit('auction:closed', { slotId: slot.id, winnerUserId: winner.userId });
-  getIO()
-    ?.to(`user:${winner.userId}`)
-    .emit('auction:won', {
-      slotId: slot.id,
-      stationName: slot.station.name,
-      amount: winner.amount,
-    });
+  getIO()?.to(`user:${winner.userId}`).emit('auction:won', {
+    slotId: slot.id,
+    stationName: slot.station.name,
+    amount: winner.amount,
+  });
 
   const { subject, html } = emailTemplates.auctionWon(winner.user.name, {
     stationName: slot.station.name,

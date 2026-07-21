@@ -134,12 +134,10 @@ export const placeBid = async (req, res, next) => {
       const winnerId = contenders.map((c) => c.id).sort()[0];
       if (bid.id !== winnerId) {
         await prisma.bid.delete({ where: { id: bid.id } });
-        return res
-          .status(409)
-          .json({
-            success: false,
-            message: 'You already have a pending bid on this slot — please try again.',
-          });
+        return res.status(409).json({
+          success: false,
+          message: 'You already have a pending bid on this slot — please try again.',
+        });
       }
     }
 

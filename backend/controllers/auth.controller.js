@@ -92,13 +92,11 @@ export const setupAdmin = async (req, res, next) => {
 
     const existingAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
     if (existingAdmin) {
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message:
-            'An admin account already exists. Use the admin panel to manage users from here on.',
-        });
+      return res.status(409).json({
+        success: false,
+        message:
+          'An admin account already exists. Use the admin panel to manage users from here on.',
+      });
     }
 
     const { name, email, password, phone } = req.body;
@@ -140,13 +138,11 @@ export const setupAdmin = async (req, res, next) => {
       const winnerId = allAdmins.map((a) => a.id).sort()[0];
       if (admin.id !== winnerId) {
         await prisma.user.delete({ where: { id: admin.id } });
-        return res
-          .status(409)
-          .json({
-            success: false,
-            message:
-              'An admin account already exists. Use the admin panel to manage users from here on.',
-          });
+        return res.status(409).json({
+          success: false,
+          message:
+            'An admin account already exists. Use the admin panel to manage users from here on.',
+        });
       }
     }
 
