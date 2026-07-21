@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { visualizer } from 'rollup-plugin-visualizer'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
   plugins: [
@@ -13,12 +13,16 @@ export default defineConfig({
     // taking up space), just via the Rollup ecosystem, since that's what
     // Vite builds with — webpack-bundle-analyzer itself can't attach to a
     // non-Webpack build regardless of preference.
-    ...(process.env.ANALYZE === 'true' ? [visualizer({
-      filename: 'dist/bundle-analysis.html',
-      gzipSize: true,
-      brotliSize: true,
-      template: 'treemap',
-    })] : []),
+    ...(process.env.ANALYZE === 'true'
+      ? [
+          visualizer({
+            filename: 'dist/bundle-analysis.html',
+            gzipSize: true,
+            brotliSize: true,
+            template: 'treemap',
+          }),
+        ]
+      : []),
   ],
   server: {
     port: 3000,
@@ -51,8 +55,9 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           redux: ['@reduxjs/toolkit', 'react-redux'],
-        }
-      }
-    }
-  }
-})
+          sentry: ['@sentry/react'],
+        },
+      },
+    },
+  },
+});
