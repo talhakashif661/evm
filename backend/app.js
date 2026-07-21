@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { getAllowedOrigins } from './utils/corsOrigins.js';
 import prisma from './utils/prisma.js';
+import logger from './utils/logger.js';
 
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
@@ -157,9 +158,22 @@ app.use('/api/auth/forgot-password', forgotPasswordLimiter);
 app.use('/api/auth/setup-admin', setupAdminLimiter);
 app.use('/api/complaints', complaintLimiter);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// Health check. Path kept as `/health` — already wired into Render's health
+// check config (see DEPLOYMENT.md). Previously returned 200 unconditionally,
+// which only proved the Express process was up, not that the app could
+// actually serve a request — a lost DB connection would still show "healthy"
+// to Render/Docker/k8s. Now runs a cheap real query so a broken DB connection
+// correctly flips this to a failing check the orchestrator can act on.
+app.get('/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'OK', database: 'connected', timestamp: new Date().toISOString() });
+  } catch (error) {
+    logger.error('Health check failed — database unreachable:', error.message);
+    res
+      .status(503)
+      .json({ status: 'ERROR', database: 'disconnected', timestamp: new Date().toISOString() });
+  }
 });
 
 // Sitemap — the static public pages plus every currently-APPROVED station,

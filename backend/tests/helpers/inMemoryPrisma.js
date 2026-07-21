@@ -433,6 +433,12 @@ export function createInMemoryPrisma() {
     $connect: async () => {},
     $disconnect: async () => {},
     $transaction: async (arg) => (typeof arg === 'function' ? arg(client) : Promise.all(arg)),
+    // Real Prisma Client's $queryRaw is a tagged-template function; the health
+    // check only cares that the promise resolves, not the shape of the rows,
+    // so this stand-in ignores its arguments and mimics a trivial SELECT 1.
+    // A test can override this per-case (e.g. `mockPrisma.$queryRaw = async
+    // () => { throw new Error('down') }`) to simulate the DB being down.
+    $queryRaw: async () => [{ '?column?': 1 }],
     _store: store, // exposed for test setup/inspection
   };
   for (const m of Object.keys(MODELS)) client[m] = delegate(m);
