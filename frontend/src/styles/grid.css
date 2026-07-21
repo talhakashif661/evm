@@ -1,0 +1,155 @@
+/* ============================================================
+   Custom grid + utility layer — Phase 10 (Bootstrap removal).
+   ============================================================
+
+   This replaces ONLY the specific Bootstrap classes this app actually
+   uses, measured directly against the codebase rather than assumed:
+
+     container, row, col-6, col-12, col-sm-6,
+     col-md-2/3/4/5/6, col-lg-3/4/5/7, g-3, g-4,
+     mb-3, mb-4, mt-2, w-100, align-items-center
+
+   Breakpoints (576/768/992px) and the spacing scale (0.25rem step at
+   Bootstrap's own "2"/"3"/"4" tokens) intentionally match Bootstrap 5's
+   own values exactly — not because Bootstrap is a reference to defer to,
+   but because THIS APP'S existing responsive behavior was built and
+   tuned against those specific breakpoints. Changing them would change
+   where every page's layout currently reflows, which is exactly the
+   "existing functionality" this migration is supposed to preserve.
+
+   NOTE — this file is additive only. It does not remove the Bootstrap
+   CSS import, and no page/component has been switched to use these
+   classes yet. See PHASE_10_BOOTSTRAP_REMOVAL_PLAN.md before wiring
+   this up to any real page: the plan calls for a visual sign-off on a
+   pilot page first, since this is the one category of change in this
+   entire engagement that can't be verified by tests, linting, or a
+   build passing — only by actually looking at it.
+*/
+
+:root {
+  --grid-gutter-x: 1.5rem;
+  --grid-gutter-y: 0;
+}
+
+.container {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: calc(var(--grid-gutter-x) * 0.5);
+}
+
+@media (min-width: 576px) {
+  .container {
+    max-width: 540px;
+  }
+}
+@media (min-width: 768px) {
+  .container {
+    max-width: 720px;
+  }
+}
+@media (min-width: 992px) {
+  .container {
+    max-width: 960px;
+  }
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: calc(var(--grid-gutter-y) * -1);
+  margin-inline: calc(var(--grid-gutter-x) * -0.5);
+}
+
+.row > * {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  padding-inline: calc(var(--grid-gutter-x) * 0.5);
+  margin-top: var(--grid-gutter-y);
+}
+
+/* Gutter utilities — Bootstrap's g-3 = 1rem, g-4 = 1.5rem, applied to both axes */
+.g-3 {
+  --grid-gutter-x: 1rem;
+  --grid-gutter-y: 1rem;
+}
+.g-4 {
+  --grid-gutter-x: 1.5rem;
+  --grid-gutter-y: 1.5rem;
+}
+
+/* Column widths actually used in this codebase (12-column basis) */
+.col-6 {
+  flex: 0 0 auto;
+  width: 50%;
+}
+.col-12 {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+@media (min-width: 576px) {
+  .col-sm-6 {
+    flex: 0 0 auto;
+    width: 50%;
+  }
+}
+
+@media (min-width: 768px) {
+  .col-md-2 {
+    flex: 0 0 auto;
+    width: 16.66666667%;
+  }
+  .col-md-3 {
+    flex: 0 0 auto;
+    width: 25%;
+  }
+  .col-md-4 {
+    flex: 0 0 auto;
+    width: 33.33333333%;
+  }
+  .col-md-5 {
+    flex: 0 0 auto;
+    width: 41.66666667%;
+  }
+  .col-md-6 {
+    flex: 0 0 auto;
+    width: 50%;
+  }
+}
+
+@media (min-width: 992px) {
+  .col-lg-3 {
+    flex: 0 0 auto;
+    width: 25%;
+  }
+  .col-lg-4 {
+    flex: 0 0 auto;
+    width: 33.33333333%;
+  }
+  .col-lg-5 {
+    flex: 0 0 auto;
+    width: 41.66666667%;
+  }
+  .col-lg-7 {
+    flex: 0 0 auto;
+    width: 58.33333333%;
+  }
+}
+
+/* Spacing/layout utilities actually used in this codebase */
+.mb-3 {
+  margin-bottom: 1rem;
+}
+.mb-4 {
+  margin-bottom: 1.5rem;
+}
+.mt-2 {
+  margin-top: 0.5rem;
+}
+.w-100 {
+  width: 100%;
+}
+.align-items-center {
+  align-items: center;
+}
