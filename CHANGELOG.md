@@ -3,6 +3,46 @@
 > Prior engagement history lives in `CHANGELOG_FIXES.md`. This file tracks work
 > from the current audit/overhaul engagement.
 
+## [Unreleased] — Debug pass: run-on-first-try robustness
+
+Requested as a "senior debugger" pass: make the codebase run on the first
+try without terminal/browser crashes, starting with static code analysis
+(missing imports, undefined vars, case-sensitive path errors, bracket
+errors).
+
+- **Static analysis came back clean — nothing to fix.** Verified rather
+  than assumed: a custom case-sensitive import resolver confirmed all 313
+  relative imports across frontend and backend resolve to real files with
+  exact-case paths (the check ESLint misses on a case-insensitive
+  filesystem, and the one that catches "runs locally, crashes on the Linux
+  deploy box"); `node --check` parsed every backend `.js` with no
+  bracket/syntax errors; the frontend production build (esbuild — the
+  authoritative JSX parse check) succeeded; ESLint clean both sides.
+- **The one real crash-on-first-run issue was not a static one**, so it
+  wouldn't have been caught by the above: even with `DATABASE_URL` set, the
+  server could crash on the actual DB connection (or, on a fresh machine,
+  an ungenerated Prisma client) with a raw stack trace. Hardened:
+  - `server.js` now runs a preflight `SELECT 1` before `listen()`, so an
+    unreachable database fails at boot with an actionable checklist instead
+    of surfacing as an opaque 500 on the first request that hits the DB.
+    Skipped under `NODE_ENV=test`.
+  - `prisma.js` wraps client construction so an ungenerated client throws a
+    legible `[FATAL]` "run prisma generate" message instead of a raw
+    internal stack trace at import time.
+  - New `npm run doctor` (`scripts/doctor.mjs`): a standalone preflight that
+    checks the `.env` file, required vars, Prisma client generation, and
+    live DB connectivity — each failure paired with its specific fix. Meant
+    to be run before `npm start` on a new machine.
+  - Widened the backend `format`/`format:check` globs to `**/*.{js,mjs}` so
+    the new `.mjs` script stays covered.
+
+### Verified
+`npx eslint .` and `npx prettier --check` — clean (both). Custom import
+resolver — 313/313 resolve case-sensitively. Full backend suite — 73/73,
+unaffected (tests import `app.js`, not `server.js`). `npm run doctor`
+correctly reports and explains the sandbox's own missing-engine-binary
+state instead of crashing.
+
 ## [Unreleased] — Phase 10: Remove Bootstrap (scoping only)
 
 Requested as a correction to a Phase 9.2 note that conflicted with the
