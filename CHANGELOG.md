@@ -3,6 +3,201 @@
 > Prior engagement history lives in `CHANGELOG_FIXES.md`. This file tracks work
 > from the current audit/overhaul engagement.
 
+## [Unreleased] — Phase 9: Final Verification
+
+Went through the 13-item verification checklist against the running tools,
+not the prior phase summaries. Found and fixed a real gap along the way
+(below); everything else is reported with actual evidence per item — see
+this engagement's own handoff doc for why that matters here specifically.
+
+- **Real bug found and fixed**: `npm test` (the actual unfiltered script,
+  not the `jest e2e.smoke` filter this engagement had been running) failed
+  — 3 of 5 suites (`auth.validation.test.js`, `booking-bid.guard.test.js`,
+  `priority.scoring.test.js`) crashed on import with "Must use import to
+  load ES Module" from the generated Prisma client. Root cause: unlike
+  `e2e.smoke.test.js` and `health.test.js`, these three imported `app.js` or
+  `bid.controller.js` directly instead of mocking `utils/prisma.js` first —
+  so they transitively loaded the real `@prisma/client`, which can't
+  initialize in this sandbox specifically (the query engine binary never
+  downloaded, since `binaries.prisma.sh` is blocked — a limitation this
+  engagement already knew about, just not that it reached this far). Fixed
+  by applying the exact same `jest.unstable_mockModule('../utils/prisma.js',
+  ...)` pattern the other two files already used, dynamically importing the
+  app/controller afterward. `npm test` now genuinely passes: 5/5 suites,
+  73/73 tests, real exit code 0 (double-checked directly — piping through
+  `tail` had silently been masking a non-zero exit code earlier in this
+  engagement's own verification runs, which is worth knowing for next time).
+
+### Checklist status (each verified directly, not assumed)
+1. All above phases complete — yes, per this and the Phase 8.2/8.3 entries.
+2. `npm install` — frontend: clean. Backend: packages install fine, but the
+   `postinstall` (`prisma generate`) step itself fails in this sandbox for
+   the same `binaries.prisma.sh`-blocked reason above; the generated JS
+   client lands but not the query engine binary. Expected to complete
+   cleanly on a machine with normal internet access.
+3. `npm run dev` — frontend: confirmed working (`VITE ready`, live GET to
+   `http://localhost:3000/` returned 200 with real HTML). Backend: **crashes
+   immediately** in this sandbox — `new PrismaClient()` throws synchronously
+   without the query engine binary, so Express never even starts listening,
+   confirmed via a live start/curl/kill cycle. Same root cause as #2, not a
+   code defect — `prisma/schema.prisma`'s generator block is a plain
+   `prisma-client-js` provider with no unusual `binaryTargets`, so this is
+   expected to start cleanly on Render or any machine with real internet
+   access. Recommend confirming this specifically outside this sandbox
+   before considering deployment verification complete.
+4. All tests pass (`npm test`) — yes, now (see fix above). 5/5 suites,
+   73/73 tests.
+5. Frontend build — clean, previously confirmed multiple times this
+   engagement (most recently after the Sentry chunk-splitting change).
+6. No errors in browser console — **cannot verify**; no live browser in
+   this sandbox (an existing, already-documented limitation).
+7. No 404 errors — partially checked at the code level: every static
+   `Link`/`navigate` target in `pages/` and `components/` matches a route
+   actually defined in `App.jsx`; no mismatches found. Genuine live-navigation
+   404 testing isn't possible without a browser.
+8. Mobile responsive — unchanged since Phase 5.4's code-level audit (same
+   methodology and same disclosure: no live browser, so no real viewport
+   testing was possible then either).
+9. Color scheme matches cream/dark theme — confirmed: `index.css` defines
+   `--bg-primary: #fdf8f0`, `--bg-dark: #1a1a1a`, `--accent-gold: #c9a96e`
+   as the actual custom properties in use. A handful of components hardcode
+   their own hex values for narrow, specific accents (star ratings, status
+   badges) rather than the shared variables — not necessarily wrong, but
+   worth a look if full palette centralization matters going forward.
+10. CTAs clear and functional — code-level check only (no empty
+    `onClick={() => {}}` handlers, no placeholder `href="#"` links, no
+    leftover TODO/FIXME markers found); genuine interaction testing isn't
+    possible without a browser.
+11. SEO meta tags on every page — confirmed: all 26 page files under
+    `pages/` render the `<SEO` component; zero missing.
+12. Hero section looks professional — **cannot verify**; this is a visual/
+    design judgment that requires actually seeing the rendered page, which
+    this sandbox can't do.
+13. No dead links or buttons — same code-level check as #7/#10 (routes and
+    handlers all check out); can't be verified beyond that without live
+    navigation.
+
+### Verified
+`npx eslint .` — zero problems (frontend and backend, re-confirmed after the
+test-file fixes). `npm test` (backend, real unfiltered command) — 73/73
+passing, exit code 0.
+
+## [Unreleased] — Phase 8.3: Deployment Preparation
+
+Checklist: production `.env` files, production API URLs, HTTPS, error
+tracking (Sentry), analytics (GA or Plausible), Dockerfile (optional),
+health check endpoint. Verified several of these were already done in
+earlier phases without being labeled as such — see below. Remaining after
+this entry: Dockerfile (optional, not yet started).
+
+- **Already done, confirmed this phase**: health check endpoint (`/health`
+  in `app.js`, runs a real `SELECT 1` against the DB and returns 503 on
+  failure, already wired into Render's health check config per its own
+  comment); production API URL handling (`frontend/src/utils/api.js` and
+  `socket.js` both read `VITE_API_URL` with a `/api` local-dev fallback,
+  never hardcoded); `.env.example` files for both frontend and backend
+  already carry full inline production guidance for every variable. HTTPS
+  is effectively handled by the Vercel/Render hosting choice itself (both
+  provide it automatically for their URLs) — nothing in this app's own code
+  assumes or requires plain HTTP.
+- **Error tracking (Sentry)**: added `@sentry/react` (frontend) and
+  `@sentry/node` (backend), wired into the exact hook point
+  `logger.js`'s own comment already pointed to — every existing
+  `logger.error(...)` call site across the whole app (including
+  `error.middleware.js`'s central handler, which already wraps every
+  unhandled route error) now reports to Sentry for free. No-ops entirely
+  unless `VITE_SENTRY_DSN` / `SENTRY_DSN` is set, and even then only in a
+  production build / when `NODE_ENV=production` — local dev never sends
+  events. New env vars documented in both `.env.example` files.
+  Frontend: gave Sentry its own Vite manual chunk (`vite.config.js`) rather
+  than letting it bloat the main bundle — confirmed via a rebuild
+  (88.41 kB / 29.88 kB gzip in its own chunk; main `index` bundle back to
+  its pre-Sentry size).
+- **Analytics (Google Analytics 4)**: added `frontend/src/utils/analytics.js`
+  — a small hand-rolled gtag.js loader (matching this codebase's existing
+  style of lightweight utilities over pulling in a wrapper library).
+  `send_page_view: false` on init, since this is an SPA and the automatic
+  pageview would only ever fire once on initial load; `trackPageView()` is
+  instead called explicitly from `App.jsx` on every `location.pathname`
+  change. No-ops entirely unless `VITE_GA_MEASUREMENT_ID` is set, and even
+  then only in a production build.
+
+### Verified
+`npx eslint .` — zero problems (frontend and backend). `npx prettier
+--check` — clean (both). `npm run build` (frontend) — clean, Sentry
+confirmed in its own chunk. Full e2e suite — 54/54 passing, no regressions.
+
+## [Unreleased] — Phase 8.2: Code Quality
+
+Checklist: ESLint, Prettier, console.log audit, naming conventions, DRY pass,
+component extraction. First four verified/addressed below (existing config
+and code confirmed against the running tools rather than assumed — part of
+this entry was assembled that way, since it had not actually been logged
+yet); DRY pass and component extraction continue as separate work.
+
+- **ESLint** set up from scratch for both `frontend/` and `backend/` (wasn't
+  configured anywhere before). Flat config (`eslint.config.js`), matching
+  ESLint v9's default. Both fully clean — zero problems.
+  - Caught two false-positive sources in the tooling itself rather than
+    trusting it blindly: a missing `eslint-plugin-react` caused ~300 false
+    "unused import" warnings on genuinely-used JSX component imports;
+    `eslint-plugin-react-hooks@7`'s "recommended" config bundles
+    experimental React-Compiler-prep rules not applicable to this
+    non-Compiler React 18 app (flagged the already-verified-correct
+    `Countdown` component from Phase 6.1) — scoped down to the two stable
+    rules (`rules-of-hooks`, `exhaustive-deps`).
+  - Real bug fixed via linting: `AuctionHub.jsx`'s socket-room subscription
+    effect depended on `stations.length` instead of the actual set of open
+    slot IDs, so the socket could stay subscribed to a stale room if one
+    auction closed while a different opened. Fixed with a derived key.
+  - Genuinely dead code removed: a wasted `/stations/owner/revenue` API call
+    in `StationReport.jsx` whose response was fetched and never used.
+  - `PasswordStrengthBar`/`getPasswordStrength` extracted out of
+    `Register.jsx` into `components/PasswordStrengthBar.jsx` (pure
+    component) + `utils/passwordStrength.js` (scoring logic) — two files
+    because Vite Fast Refresh only works cleanly when a file exports just
+    components.
+  - `npm audit fix` (backend) resolved 2 transitive-dependency
+    vulnerabilities with no breaking changes.
+  - `auth.middleware.js`'s empty catch now uses `logger.debug` (dev-only)
+    instead of `.error` for expired/invalid JWTs — routine and expected, not
+    a server problem, so it shouldn't add production log noise.
+
+- **Prettier** installed and configured for both `frontend/` and `backend/`
+  — one shared root-level `.prettierrc.json` (`semi: true`,
+  `singleQuote: true`, `trailingComma: "es5"`, `printWidth: 100`,
+  `tabWidth: 2`, `arrowParens: "always"`, `endOfLine: "lf"`), `format` /
+  `format:check` scripts in both `package.json`s, `eslint-config-prettier`
+  wired in last in both `eslint.config.js` files so ESLint's stylistic
+  rules never fight Prettier. Full `prettier --write` pass applied to both
+  codebases; `prettier --check` now reports clean on both.
+
+- **console.log audit**: swept `frontend/src` and `backend/` for raw,
+  un-gated `console.(log|warn|error|debug)` calls not already routed
+  through the logger utilities. Frontend: none at all. Backend: exactly two
+  legitimate exceptions, both CLI-only dev tooling outside the app's
+  request lifecycle — `prisma/seed.js` and `scripts/setup-env.mjs` — left
+  as-is since routing one-shot CLI output through the app's request-scoped
+  logger would add nothing.
+
+- **Naming conventions**: audited file-naming patterns across
+  `frontend/src/{pages,components,utils}` and
+  `backend/{controllers,routes,middleware,utils,validators,services}`.
+  Frontend: fully consistent (PascalCase pages/components, camelCase utils)
+  with no exceptions. Backend: fully consistent except
+  `backend/middleware/validate.js` and `validateQuery.js`, which didn't
+  follow the established `<name>.middleware.js` pattern used by the other
+  three files in that folder (`auth.middleware.js`, `error.middleware.js`,
+  `kyc.middleware.js`) despite being genuine Express middleware used the
+  same way. Renamed both to match (`validate.middleware.js`,
+  `validateQuery.middleware.js`) and updated their imports across all 6
+  route files that use them.
+
+### Verified
+`npx eslint .` — zero problems (frontend and backend). `npx prettier
+--check` — clean (both). Full e2e suite — 54/54 passing, no regressions
+(re-confirmed again after the middleware rename specifically).
+
 ## [Unreleased] — Phase 8.1: Documentation
 
 - **README.md**: added a "Design" section (real color tokens + rationale),
