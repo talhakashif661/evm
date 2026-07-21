@@ -3,6 +3,38 @@
 > Prior engagement history lives in `CHANGELOG_FIXES.md`. This file tracks work
 > from the current audit/overhaul engagement.
 
+## [Unreleased] — Phase 10: Remove Bootstrap (scoping only)
+
+Requested as a correction to a Phase 9.2 note that conflicted with the
+Phase 1 tech-stack constraint. Confirmed as genuinely wanted and scoped as
+its own phase rather than folded into deployment prep — see
+`PHASE_10_BOOTSTRAP_REMOVAL_PLAN.md` for the full writeup.
+
+- Measured the actual scope: 34/43 frontend files, 334 Bootstrap-ish
+  className occurrences (104 grid, 111 form controls, 55 spacing
+  utilities, 22 raw component classes), zero existing CSS Modules,
+  227 KB of Bootstrap CSS shipped in full regardless of usage.
+- Found buttons/cards/navbar/hero/footer/forms already have custom CSS
+  overrides from Phase 2 — meaningfully lower risk than the raw numbers
+  suggest. Badges/alerts/spinners/tables/dropdowns and `form-check`
+  checkboxes don't, and are flagged as needing real design decisions
+  during migration, not mechanical replication.
+- Added `frontend/src/styles/grid.css` — a right-sized grid + utility
+  layer covering exactly the measured tokens, matching Bootstrap's own
+  breakpoints/spacing so the app's current responsive behavior doesn't
+  shift. Purely additive: not imported anywhere yet, no existing page
+  touched, Bootstrap's own CSS untouched.
+- Deliberately did not touch any of the 34 existing files. This is the
+  first phase in the engagement where the main risk — does it actually
+  look right — can't be checked by anything available in this sandbox
+  (no live browser, and the test suite only covers backend behavior).
+  Plan recommends a pilot page with a real visual sign-off before
+  migrating the rest.
+
+### Verified
+`npx eslint .` and `npm run build` (frontend) — clean, unaffected by the
+new unused file. Full backend suite — 73/73, unaffected.
+
 ## [Unreleased] — Phase 9: Final Verification
 
 Went through the 13-item verification checklist against the running tools,
