@@ -1,4 +1,19 @@
-import { calculatePriority } from '../controllers/bid.controller.js';
+import { jest } from '@jest/globals';
+
+// calculatePriority itself is a pure function (see comment below) but it
+// lives in bid.controller.js, which imports prisma.js at the top — so
+// importing the controller at all drags in the real @prisma/client even
+// though this file never touches the database. Mocking Prisma first (same
+// pattern as e2e.smoke.test.js / health.test.js) sidesteps that entirely,
+// including in this sandbox specifically, where the real client can't
+// initialize because binaries.prisma.sh being blocked prevented the query
+// engine binary from downloading.
+process.env.NODE_ENV = 'test';
+
+const { createInMemoryPrisma } = await import('./helpers/inMemoryPrisma.js');
+jest.unstable_mockModule('../utils/prisma.js', () => ({ default: createInMemoryPrisma() }));
+
+const { calculatePriority } = await import('../controllers/bid.controller.js');
 
 // Pure-function tests for the auction priority formula. No DB, no network —
 // calculatePriority(amount, batteryLevel) depends only on its arguments and a

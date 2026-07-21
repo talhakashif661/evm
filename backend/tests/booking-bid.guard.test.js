@@ -1,5 +1,16 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
-import app from '../app.js';
+
+// See auth.validation.test.js for why this mocks Prisma before importing
+// app.js — same reasoning applies here.
+process.env.NODE_ENV = 'test';
+
+const { createInMemoryPrisma } = await import('./helpers/inMemoryPrisma.js');
+const mockPrisma = createInMemoryPrisma();
+
+jest.unstable_mockModule('../utils/prisma.js', () => ({ default: mockPrisma }));
+
+const { default: app } = await import('../app.js');
 
 // Booking/bid creation both sit behind `authenticate`, which runs before the
 // route's own express-validator rules. Without a valid JWT it short-circuits

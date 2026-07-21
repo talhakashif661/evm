@@ -1,5 +1,23 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
-import app from '../app.js';
+
+// Mirrors e2e.smoke.test.js / health.test.js: swap Prisma for the in-memory
+// mock BEFORE app.js is loaded, so importing the app never touches the real
+// @prisma/client (and, in this sandbox specifically, never needs the query
+// engine binary that binaries.prisma.sh being blocked prevents downloading).
+// These tests genuinely need the full Express app (real routes, real
+// express-validator rules) — the comment below about "never reach
+// Prisma/MongoDB" was already true at the assertion level, this just makes
+// it true at the import level too, so `npm test` doesn't require a working
+// Prisma client at all for this file.
+process.env.NODE_ENV = 'test';
+
+const { createInMemoryPrisma } = await import('./helpers/inMemoryPrisma.js');
+const mockPrisma = createInMemoryPrisma();
+
+jest.unstable_mockModule('../utils/prisma.js', () => ({ default: mockPrisma }));
+
+const { default: app } = await import('../app.js');
 
 // These tests only exercise the express-validator rules wired up in
 // routes/auth.routes.js. They deliberately never reach Prisma/MongoDB, so
@@ -22,14 +40,12 @@ describe('POST /api/auth/register — validation', () => {
   });
 
   it('rejects an invalid role', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        password: 'password123',
-        role: 'ADMIN',
-      });
+    const res = await request(app).post('/api/auth/register').send({
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      password: 'password123',
+      role: 'ADMIN',
+    });
     expect(res.status).toBe(400);
   });
 });
