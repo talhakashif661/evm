@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/ev-icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Static fallback meta tags — shown before React/Helmet mounts, and to
+         any crawler that doesn't execute JS. react-helmet-async overwrites
+         these with page-specific values once a route renders. -->
+    <title>ChargeEV - EV Charging Made Simple</title>
+    <meta name="description" content="Find, book, and manage EV charging stations in real time. Transparent pricing, AI-powered recommendations, and live slot auctions — all in one place." />
+    <meta property="og:title" content="ChargeEV - EV Charging Made Simple" />
+    <meta property="og:description" content="Find, book, and manage EV charging stations in real time." />
+    <meta property="og:type" content="website" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Self-hosted Inter (public/fonts/, declared via @font-face in
+         index.css) — preloading only the 400 weight, since that's what's
+         used for body text almost everywhere and is the one weight that
+         genuinely blocks first meaningful paint. Preloading every weight
+         would just spread the same bottleneck across 5 requests instead
+         of fixing it for the one that matters most. -->
+    <link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

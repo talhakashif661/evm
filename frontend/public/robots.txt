@@ -1,0 +1,30 @@
+# See frontend/src/components/SEO.jsx for the per-page noIndex logic this
+# mirrors — these Disallow rules match the pages marked noIndex there.
+User-agent: *
+
+# Private / authenticated app pages — no public search value, and indexing
+# thin authenticated-shell pages is a known way to hurt overall search-quality
+# signals (see AUDIT notes / CHANGELOG Phase 4.1).
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /dashboard
+Disallow: /bookings
+Disallow: /payments
+Disallow: /history
+Disallow: /auction
+Disallow: /evs
+Disallow: /ai-recommend
+Disallow: /profile
+Disallow: /owner/
+Disallow: /admin/
+
+# Everything else (/, /stations, /stations/:id, /about, /contact) is allowed
+# by default — no explicit Allow needed.
+
+# REPLACE with your real deployed frontend domain before going live — this
+# can't be known from within the dev sandbox this was built in. Matches the
+# placeholder style already used in backend/.env.example (CLIENT_URL).
+Sitemap: https://your-frontend.vercel.app/sitemap.xml

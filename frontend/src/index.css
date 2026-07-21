@@ -1,0 +1,647 @@
+/* Self-hosted Inter (via @fontsource/inter — see package.json; the actual
+   woff2 files are copied into public/fonts/ for stable, un-hashed paths so
+   index.html can genuinely <link rel="preload"> the critical 400 weight,
+   which isn't possible with Google Fonts' dynamically-generated URLs).
+   This also drops an entire third-party origin from the page's critical
+   path — no more DNS/TLS/request round-trip to fonts.googleapis.com. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/inter-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.woff2') format('woff2');
+}
+
+/* ==========================================================================
+   ChargeEV — cream / dark theme
+   Warm cream backgrounds, near-black solid buttons + navbar, minimal gold
+   accent. Everything routes through these CSS variables. Both the canonical
+   names (--bg-primary, --btn-primary-bg, --accent-gold, --card-shadow, …) and
+   the legacy names the existing components already reference are defined here
+   and mapped to the same values, so the entire app re-themes from this block.
+   ========================================================================== */
+:root {
+  /* Backgrounds */
+  --bg-primary: #FDF8F0;
+  --bg-secondary: #F5EDE0;
+  --bg-card: #FFFFFF;
+  --bg-dark: #1A1A1A;
+
+  /* Text */
+  --text-primary: #1A1A1A;
+  --text-secondary: #4A4A4A;
+  --text-light: #FDF8F0;
+  --text-muted: #6E6E6E;  /* was #8A8A8A — 3.27:1 against cream, fails AA's 4.5:1 for
+    normal-size text (this is used for small captions/labels app-wide, not
+    large text). Computed and verified: 4.82:1 against the cream page bg. */
+
+  /* Accent */
+  --accent-gold: #C9A96E;
+  --accent-gold-light: #E8D5A8;
+  --accent-gold-dark: #A8894E;
+
+  /* Status */
+  --success: #2D7D46;
+  --error: #B33A3A;
+  --warning: #7F6019;  /* was #D4A02B — verified 1.88:1 against its own badge
+    background (#F1E3D3), failing AA badly. This is also used as direct text
+    color in ~25 places beyond badges (stat values, table cells, prices),
+    so this is a base-variable fix, not badge-only. Computed and verified:
+    clears 4.5:1 against every background it's actually used on (cream page
+    bg 5.53:1, white cards 5.85:1, its own badge tint 4.64:1). */
+  --info: #295BAC;     /* was #3B82F6 — verified 2.91:1 against its own badge
+    background, same reasoning and same breadth of reuse as --warning above.
+    Verified: cream 6.23:1, white 6.59:1, own badge tint 5.22:1. */
+
+  /* Buttons */
+  --btn-primary-bg: #1A1A1A;
+  --btn-primary-text: #FDF8F0;
+  --btn-primary-hover: #333333;
+
+  /* Cards */
+  --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  --card-radius: 12px;
+
+  /* Transitions */
+  --transition: all 0.3s ease;
+
+  /* ============================================================
+     Compatibility aliases — NOT part of the palette above.
+     ~40 existing files still reference these older variable names
+     (--primary, --border, --radius, --shadow-sm, --text-body, etc.).
+     Every one of them is now DERIVED from the canonical tokens above
+     — no independent colors live down here. Removing this block
+     without first rewriting every call site will visibly break
+     borders, shadows, and hover states across the app.
+     ============================================================ */
+  --bg-page:      var(--bg-primary);
+  --bg-surface:   #FFFFFF;
+  --bg-elevated:  var(--bg-secondary);
+  --text-body:    var(--text-secondary);
+
+  --primary:        var(--text-primary);   /* old "brand" color = new near-black */
+  --primary-light:  var(--btn-primary-hover);
+  --primary-dark:   #000000;
+  --secondary:      var(--accent-gold);
+  --secondary-dark: var(--accent-gold-dark);
+  --accent:         var(--info);
+  --gold:           var(--primary);
+  --gold-dark:      var(--primary-dark);
+  --brown:          #96551A;
+  --danger:         var(--error);
+
+  --primary-glow: #F1E9DC;
+  --accent-glow:  #EFE6D6;
+
+  --border:       #E0D6C6;
+  --border-hover: var(--accent-gold);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: var(--card-shadow);
+  --shadow-lg: 0 10px 28px rgba(0,0,0,0.12);
+  --shadow:    var(--shadow-md);
+
+  --radius:    10px;
+  --radius-sm: 6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-body);
+  min-height: 100vh;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+h1,h2,h3,h4,h5,h6 {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+h1, h2, h3 { font-weight: 700; }
+h4, h5, h6 { font-weight: 700; }
+
+img { max-width: 100%; display: block; }
+
+/* Links — dark by default; gold underline on hover. Scoped to unclassed <a> so
+   buttons and nav links (which set their own colors) are never affected. */
+a { color: var(--text-primary); text-decoration: none; }
+a:not([class]):hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent-gold);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-elevated); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* Focus rings — solid outline, not a soft glow */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* ==========================================================================
+   Layout shell
+   ========================================================================== */
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+.app-main { flex: 1; }
+.page-container { max-width: 1200px; margin: 0 auto; padding: 44px 32px; }
+
+/* ==========================================================================
+   Marquee announcement bar
+   ========================================================================== */
+.marquee-bar {
+  background: var(--primary);
+  color: #fff;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+}
+.marquee-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 48px;
+  padding: 8px 0;
+  animation: marquee-scroll 24s linear infinite;
+  will-change: transform;
+}
+.marquee-bar:hover .marquee-track { animation-play-state: paused; }
+.marquee-track span {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
+/* ==========================================================================
+   Navbar
+   ========================================================================== */
+.navbar-root {
+  background: var(--bg-dark);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky; top: 0; z-index: 200;
+}
+/* Desktop nav links — cream, dimmed until hover/active; gold active indicator */
+.navbar-desktop-links .navbar-link {
+  color: rgba(253,248,240,0.72);
+  text-decoration: none; font-weight: 600; font-size: 0.9rem;
+  font-family: 'Inter', sans-serif; letter-spacing: 0.01em;
+  padding: 6px 0; border-bottom: 2px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.navbar-desktop-links .navbar-link:hover { color: var(--text-light); }
+.navbar-desktop-links .navbar-link.active {
+  color: var(--accent-gold);
+  border-bottom-color: var(--accent-gold);
+}
+/* Logged-out CTAs on the dark bar: subtle outline + gold solid */
+.nav-cta-outline {
+  background: transparent; border: 1.5px solid rgba(253,248,240,0.5);
+  color: var(--text-light); padding: 8px 18px; border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.85rem;
+  text-decoration: none; cursor: pointer; transition: var(--transition);
+}
+.nav-cta-outline:hover { background: rgba(253,248,240,0.12); border-color: var(--text-light); }
+.nav-cta-solid {
+  background: var(--accent-gold); color: #1A1A1A; border: none;
+  padding: 9px 18px; border-radius: var(--radius-sm);
+  font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.8rem;
+  text-decoration: none; cursor: pointer; transition: var(--transition);
+}
+.nav-cta-solid:hover { background: var(--accent-gold-light); transform: translateY(-1px); }
+.navbar-inner {
+  max-width: 1280px; margin: 0 auto; padding: 0 24px; height: 66px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.navbar-desktop-links { display: flex; gap: 26px; align-items: center; }
+.navbar-hamburger {
+  display: none; background: none; border: none; cursor: pointer;
+  color: var(--text-light); padding: 6px; border-radius: var(--radius-sm);
+}
+.navbar-hamburger:hover { background: rgba(255,255,255,0.12); }
+
+.navbar-mobile-panel {
+  overflow: hidden; /* required for the height:0->auto slide in Navbar.jsx to not clip incorrectly */
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+.navbar-mobile-links { display: flex; flex-direction: column; padding: 8px 24px 20px; gap: 4px; }
+.navbar-mobile-links a, .navbar-mobile-links button {
+  padding: 12px 4px; font-family: 'Inter', sans-serif; font-weight: 600;
+  font-size: 1rem; text-decoration: none; color: var(--text-secondary);
+  border-bottom: 1px solid var(--border); background: none; border-left: none; border-right: none; border-top: none;
+  text-align: left; cursor: pointer;
+}
+.navbar-mobile-links a.active { color: var(--accent-gold); }
+
+@media (max-width: 860px) {
+  .navbar-desktop-links, .navbar-desktop-right { display: none !important; }
+  .navbar-hamburger { display: inline-flex; }
+}
+
+/* ==========================================================================
+   Hero
+   ========================================================================== */
+.hero-section {
+  position: relative;
+  background: var(--bg-page);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ==========================================================================
+   Hero v2 — Phase 2.3. Layout is inline-styled (matches the rest of the
+   codebase's convention); these classes exist only for the parts inline
+   styles can't do — media queries.
+   ========================================================================== */
+.hero-v2 { padding: 108px 32px 96px; }
+@media (max-width: 860px) {
+  .hero-v2 { padding: 64px 20px 72px; }
+  .hero-v2 .hero-copy { text-align: center; align-items: center; }
+  .hero-v2 .hero-ctas, .hero-v2 .hero-stats { justify-content: center; }
+  .hero-v2 .hero-illustration { max-width: 300px; margin: 0 auto; }
+  .hero-scroll-indicator { display: none; } /* no spare vertical room once stacked */
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.site-footer {
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+.site-footer a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; }
+.site-footer a:hover { color: var(--primary); }
+.footer-social {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); transition: var(--transition);
+}
+.footer-social:hover { color: var(--primary); border-color: var(--primary); }
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+.ev-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: 24px;
+  transition: var(--transition);
+}
+.ev-card:hover { border-color: var(--accent-gold); box-shadow: var(--shadow-lg); }
+
+/* ==========================================================================
+   Buttons — dark solid primary, transparent→fill outline, subtle lift on hover
+   ========================================================================== */
+.btn-gold, .btn-primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border: none;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 11px 24px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  transition: var(--transition);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.btn-gold:hover, .btn-primary:hover {
+  background: var(--btn-primary-hover);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  transform: translateY(-1px);
+}
+.btn-gold:active, .btn-primary:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+.btn-gold:disabled, .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.btn-outline, .btn-outline-gold {
+  background: transparent;
+  border: 1.5px solid var(--text-primary);
+  color: var(--text-primary);
+  padding: 10px 22px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-size: 0.9rem;
+  transition: var(--transition);
+  text-decoration: none;
+}
+.btn-outline:hover, .btn-outline-gold:hover {
+  background: var(--text-primary);
+  color: var(--btn-primary-text);
+  border-color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+/* Small reassurance line under a high-commitment CTA — used sparingly,
+   only where there's real friction to address (payment, registration),
+   not on every repeating list-item button. */
+.cta-microcopy { font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; }
+
+.btn-danger-sm {
+  background: #F3E4E2;
+  border: 1px solid #DBAFA8;
+  color: var(--danger);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: var(--transition);
+}
+.btn-danger-sm:hover { background: #EBCFCB; }
+
+.btn-success-sm {
+  background: #E3EDE5;
+  border: 1px solid #B7D0BC;
+  color: var(--success);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: var(--transition);
+}
+.btn-success-sm:hover { background: #CFE3D3; }
+
+/* Floating back-to-top button — the one element allowed to sit "above" the
+   page, so it's also the only one that keeps a visible shadow. */
+.back-to-top {
+  position: fixed; right: 24px; bottom: 24px; z-index: 150;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--primary); color: #fff; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: var(--shadow-lg);
+  transition: var(--transition);
+}
+.back-to-top:hover { background: var(--primary-dark); }
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+.form-label { display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.form-control {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 11px 14px;
+  font-size: 1rem;
+  transition: var(--transition);
+  outline: none;
+  font-family: 'Inter', sans-serif;
+}
+.form-control:focus { border-color: var(--primary); }
+.form-control::placeholder { color: var(--text-muted); }
+.form-select {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 11px 14px;
+  font-size: 1rem;
+  cursor: pointer;
+  outline: none;
+  transition: var(--transition);
+}
+.form-select:focus { border-color: var(--primary); }
+.mb-3 { margin-bottom: 16px; }
+.mb-4 { margin-bottom: 24px; }
+.w-100 { width: 100%; }
+
+/* Stat card */
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 32px;
+  box-shadow: var(--card-shadow);
+  transition: var(--transition);
+}
+.stat-card:hover { border-color: var(--accent-gold); box-shadow: var(--shadow-lg); }
+
+/* Badges — solid light-tint fills, not translucent, small rounded rect
+   (not a pill). badge-primary/badge-gold is now a distinct navy tint,
+   separate from the green badge-success (previously identical colors). */
+.badge-gold, .badge-primary { background: #E4E9EE; color: var(--primary-dark); border: 1px solid #C3CDD8; padding: 3px 10px; border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.badge-success { background: #E3EDE5; color: #2E5B39; border: 1px solid #BFD6C5; padding: 3px 10px; border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+.badge-danger  { background: #F3E1DE; color: var(--danger); border: 1px solid #E0BAB4; padding: 3px 10px; border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+.badge-warning { background: #F1E3D3; color: var(--warning); border: 1px solid #DEC49E; padding: 3px 10px; border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+.badge-info    { background: #DEE6EC; color: var(--info); border: 1px solid #B9C7D3; padding: 3px 10px; border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+
+/* Table */
+.ev-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.ev-table th { padding: 13px 16px; text-align: left; color: var(--text-muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.ev-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.ev-table tbody tr:hover { background: var(--bg-elevated); }
+.ev-table tbody tr:last-child td { border-bottom: none; }
+
+/* Spinner — a loading indicator, not decoration, so it keeps its animation */
+.ev-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.9s linear infinite; }
+
+/* Section divider — solid line, no gradient fade */
+.glow-line { height: 1px; background: var(--border); margin: 40px 0; }
+
+/* Text utils */
+.text-primary-color { color: var(--primary) !important; }
+.text-muted { color: var(--text-muted) !important; }
+.text-danger { color: var(--danger) !important; }
+.text-success { color: var(--success) !important; }
+.text-warning { color: var(--warning) !important; }
+
+.section-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+.section-title span { color: var(--secondary); }
+
+.battery-bar {
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.battery-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(31,29,26,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+/* Mobile: a 520px-max modal with 20px overlay padding + 32px of its own
+   padding leaves only ~215px of real content width on a 320px phone —
+   nowhere near usable. Below the mobile breakpoint, switch to a near-full
+   bottom sheet instead: anchored to the bottom edge, full width, rounded
+   only on top, tighter padding so more of the actual form is visible. */
+@media (max-width: 860px) {
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal-panel {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    padding: 24px 20px !important;
+  }
+}
+
+/* A common inline pattern (two form fields side by side, e.g. First/Last
+   Name) — hardcoded "1fr 1fr" never collapses on its own, unlike the
+   auto-fit/minmax grids used elsewhere, so it needs an explicit mobile
+   override or it stays cramped into ~130px-wide columns on a 320px phone. */
+.form-grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) {
+  .form-grid-2col { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   Skeleton loaders — a plain opacity pulse instead of a moving shimmer
+   ========================================================================== */
+.skeleton {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* ==========================================================================
+   Admin layout (merged from admin-panel) — re-themed automatically since
+   it uses the same variables as everything else.
+   ========================================================================== */
+.admin-layout { display: flex; min-height: 100vh; }
+.admin-sidebar {
+  width: 240px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  position: fixed; top: 0; left: 0;
+  height: 100vh;
+  display: flex; flex-direction: column;
+  z-index: 100;
+}
+.admin-main { margin-left: 240px; flex: 1; min-height: 100vh; background: var(--bg-page); }
+.admin-content { padding: 40px; max-width: 1400px; }
+.admin-topbar {
+  height: 60px; background: var(--bg-surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 32px;
+  position: sticky; top: 0; z-index: 50;
+}
+.sidebar-link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 20px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.92rem;
+  transition: var(--transition);
+  border-left: 3px solid transparent;
+}
+.sidebar-link:hover { color: var(--primary); background: var(--bg-elevated); }
+.sidebar-link.active { color: var(--primary); background: var(--bg-elevated); border-left-color: var(--primary); }
+
+@media (max-width: 860px) {
+  .admin-sidebar { width: 72px; }
+  .admin-main { margin-left: 72px; }
+  /* Icon-only rail: hide all sidebar text, center what remains */
+  .sidebar-label { display: none; }
+  .sidebar-link { justify-content: center; padding: 13px 0; }
+  .admin-content { padding: 20px; }
+  .admin-topbar { padding: 0 16px; }
+}
+
+/* ==========================================================================
+   Respect reduced-motion: keep color/shadow changes, drop the hover lifts
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .btn-gold, .btn-primary, .btn-outline, .btn-outline-gold, .nav-cta-solid,
+  .ev-card, .stat-card { transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+  .btn-gold:hover, .btn-primary:hover, .btn-outline:hover, .btn-outline-gold:hover,
+  .nav-cta-solid:hover { transform: none; }
+}

@@ -1,0 +1,10 @@
+{
+  "redirects": [
+    { "source": "/owner/slots", "destination": "/owner/station", "permanent": true },
+    { "source": "/owner/bookings", "destination": "/owner/station", "permanent": true }
+  ],
+  "rewrites": [
+    { "source": "/sitemap.xml", "destination": "https://your-backend.onrender.com/sitemap.xml" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "ev-management-backend",
+  "version": "1.0.0",
+  "description": "AI-Powered EV Management System Backend",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "prestart": "prisma db push",
+    "start": "node server.js",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
+    "prisma:generate": "prisma generate",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
+    "lint": "eslint ."
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.10.0",
+    "@sendgrid/mail": "^8.1.6",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.2.0",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^5.10.0",
+    "socket.io": "^4.7.5",
+    "stripe": "^22.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.39.5",
+    "globals": "^17.7.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.0",
+    "supertest": "^6.3.4"
+  }
+}

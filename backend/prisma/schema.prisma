@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                       String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                     String
+  email                    String    @unique
+  password                 String
+  role                     Role      @default(EV_USER)
+  isBlocked                Boolean   @default(false)
+  isVerified               Boolean   @default(false)
+  verificationOtpHash      String?
+  verificationOtpExpiry    DateTime?
+  verifiedAt               DateTime?
+  verificationAttempts     Int       @default(0)
+  lastVerificationAttempt  DateTime?
+  verificationBlockedUntil DateTime?
+  lastOtpSentAt            DateTime?
+  phone                    String?
+  avatar                   String?
+  resetTokenHash           String?
+  resetTokenExpiry         DateTime?
+  // Set to now() by POST /api/auth/logout. Any JWT issued before this
+  // moment (compared against its `iat` claim) is rejected by `authenticate`
+  // even though its signature is still valid — this is what makes logout
+  // actually do something server-side, not just a client-side token
+  // deletion. Logs out every device/tab at once (no per-token granularity),
+  // which is the right amount of complexity for this app's scale.
+  tokenValidAfter          DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  evs      EV[]
+  bookings Booking[]
+  bids     Bid[]
+  reviews  Review[]
+  station  ChargingStation?
+  payments Payment[]
+}
+
+enum Role {
+  EV_USER
+  STATION_OWNER
+  ADMIN
+}
+
+model EV {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String   @db.ObjectId
+  model             String
+  batteryCapacity   Float
+  batteryPercentage Float    @default(100)
+  licensePlate      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings         Booking[]
+  bookingsAsActual Booking[] @relation("ActualEV")
+
+  // MongoDB doesn't auto-index relation scalar fields the way a relational
+  // FK constraint would — every prisma.eV.findFirst/findMany({where:{userId}})
+  // (booking.controller.js, ev.controller.js, slot.controller.js's auction
+  // resolution) would otherwise be a full collection scan.
+  @@index([userId])
+}
+
+model ChargingStation {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  ownerId      String        @unique @db.ObjectId
+  name         String
+  address      String
+  city         String
+  latitude     Float
+  longitude    Float
+  status       StationStatus @default(PENDING)
+  pricePerKwh  Float
+  totalRevenue Float         @default(0)
+  // Selected from a fixed checklist (station.controller.js's ALLOWED_AMENITIES)
+  // rather than free text, so the frontend can render them as a consistent
+  // badge/icon set instead of arbitrary strings.
+  amenities    String[]      @default([])
+  // Base64 data-URL images, client-side compressed before upload (mirrors
+  // the avatar pattern in Profile.jsx/user.routes.js), capped at
+  // MAX_STATION_IMAGES entries of MAX_IMAGE_BYTES each.
+  images       String[]      @default([])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slots   Slot[]
+  reviews Review[]
+
+  // status is filtered on literally every call to the public listing
+  // (always WHERE status = APPROVED), and city is the most common
+  // additional filter — a single compound index serves both "all approved
+  // stations" (using just the status prefix) and "approved stations in
+  // city X" (using both fields), same pattern as Booking's compound index
+  // below.
+  @@index([status, city])
+}
+
+enum StationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INACTIVE
+}
+
+model Slot {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  stationId   String     @db.ObjectId
+  slotNumber  Int
+  status      SlotStatus @default(AVAILABLE)
+  powerKw     Float
+  auctionOpen Boolean    @default(false)
+  auctionEnd  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  station  ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  bids     Bid[]
+
+  // Backstops the check-then-insert in slot.controller.js's addSlot: without
+  // this, two concurrent requests can both pass the pre-check and both
+  // insert, leaving two slots with the same number on one station.
+  @@unique([stationId, slotNumber])
+}
+
+enum SlotStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+}
+
+model Booking {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String        @db.ObjectId
+  evId           String        @db.ObjectId
+  slotId         String        @db.ObjectId
+  status         BookingStatus @default(PENDING)
+  startTime      DateTime
+  plannedEndTime DateTime? // scheduled end of the reserved window; null = open-ended (auction wins / legacy)
+  endTime        DateTime? // actual end, set at completion; billing uses this, not the plan
+  totalCost      Float?
+
+  // ─── Check-in / pay-upfront flow ─────────────────────────────
+  checkInTime     DateTime? // set when the customer confirms arrival at the station
+  paymentDeadline DateTime? // checkInTime + grace period; auto-cancelled if unpaid past this
+  actualEvId      String?   @db.ObjectId // EV actually charged, if swapped at check-in (defaults to evId)
+  paymentIntentId String? // Stripe PaymentIntent for the locked-in upfront amount
+  overageAmount   Float? // extra owed if actual charging time exceeds the paid-for duration
+  cancelReason    String? // NO_SHOW | PAYMENT_TIMEOUT | OWNER_CANCELLED | USER_CANCELLED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ev       EV       @relation(fields: [evId], references: [id], onDelete: Cascade)
+  actualEv EV?      @relation("ActualEV", fields: [actualEvId], references: [id])
+  slot     Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  payment  Payment?
+
+  @@index([slotId, status, startTime])
+}
+
+// Verified-purchase station reviews: a user may review a station only after
+// completing AND paying for a charging session there, and holds exactly ONE
+// (editable) review per station.
+model Review {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  stationId String   @db.ObjectId
+  rating    Int // 1-5 stars
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  station ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stationId])
+  // The unique index above leads with userId, so it can't efficiently serve
+  // ratingStatsFor's stationId-only lookups (station cards/detail pages).
+  @@index([stationId])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN // arrived, EV confirmed, awaiting payment (paymentDeadline running)
+  ACTIVE // paid, charging in progress
+  COMPLETED
+  CANCELLED
+}
+
+model Bid {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String    @db.ObjectId
+  slotId       String    @db.ObjectId
+  amount       Float
+  batteryLevel Float
+  priority     Float     @default(0)
+  status       BidStatus @default(PENDING)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  // Backs the leaderboard/eligibility queries (slotId + status='PENDING',
+  // ordered by priority) and placeBid's existing-bid lookup (userId + slotId
+  // + status), both hit on every bid placement and every auction close.
+  @@index([slotId, status])
+  @@index([userId, slotId, status])
+}
+
+enum BidStatus {
+  PENDING
+  WON
+  LOST
+  CANCELLED
+}
+
+model Payment {
+  id                    String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String        @db.ObjectId
+  bookingId             String        @unique @db.ObjectId
+  amount                Float
+  status                PaymentStatus @default(PENDING)
+  method                String        @default("SIMULATION")
+  stripePaymentIntentId String? // needed to issue a refund via the Stripe API
+  createdAt             DateTime      @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  // GET /payments/history filters by userId; GET /payments/status/:transactionId
+  // looks up by stripePaymentIntentId directly.
+  @@index([userId])
+  @@index([stripePaymentIntentId])
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Log {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?  @db.ObjectId
+  action    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  // The admin logs page (admin.controller.js) always sorts by createdAt desc.
+  @@index([createdAt])
+}
+
+// "Contact Us" submissions. Deliberately relation-free (like Log): the
+// complainer's name/email/phone are stored inline so the admin can always
+// reply even if the account is later deleted, and guests can complain too.
+model Complaint {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String?  @db.ObjectId // set when the complainer was logged in
+  name      String
+  email     String
+  phone     String? // enables the WhatsApp reply button in the admin inbox
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+
+  // Admin inbox sorts newest-first with pagination — same pattern as Log.
+  @@index([createdAt])
+}
