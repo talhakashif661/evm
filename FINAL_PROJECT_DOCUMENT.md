@@ -427,26 +427,42 @@ In `backend/.env`:
 In `frontend/.env` (both optional):
 `VITE_SENTRY_DSN` · `VITE_GA_MEASUREMENT_ID`
 
-### Step 3 — Backend
+### Step 3 — Install and run
+
+From the **repo root**, both halves start with one command:
 
 ```bash
-cd backend
-npm install          # also runs `prisma generate`
-npm run doctor       # preflight: env vars, Prisma client, DB connectivity
-npm start            # → http://localhost:5000
+npm run install:all   # root + backend + frontend (backend also runs `prisma generate`)
+npm run doctor        # preflight: env vars, Prisma client, DB connectivity
+npm start             # backend :5000 + frontend :3000, in one terminal
 ```
 
 `npm run doctor` is worth running first on any new machine — it checks
 everything needed to boot and tells you exactly what to fix if something's
 missing.
 
-### Step 4 — Frontend
+`npm start` runs both processes through `concurrently`, tagging each line
+with a coloured `[backend]` / `[frontend]` prefix so the two interleaved log
+streams stay readable. It's wired with `--kill-others-on-fail`: if the
+backend can't boot, the frontend is torn down too, rather than leaving a UI
+running against an API that isn't there and surfacing as mystery fetch
+errors. `Ctrl-C` once stops both.
+
+Use `npm run dev` instead for the same pair with hot reload (nodemon +
+Vite HMR).
+
+### Step 4 — Running them separately
+
+Two terminals, when you want the halves independent — a backend restart loop
+that doesn't disturb Vite's HMR state, or a debugger attached to just one:
 
 ```bash
-cd frontend
-npm install
-npm start            # → http://localhost:3000
+npm run start:backend    # or dev:backend
+npm run start:frontend   # or dev:frontend
 ```
+
+Both are also runnable the original way, from inside `backend/` or
+`frontend/` with `npm start`. Nothing about the per-package scripts changed.
 
 Admin panel lives at `/admin/*`.
 

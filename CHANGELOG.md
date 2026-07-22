@@ -3,6 +3,32 @@
 > Prior engagement history lives in `CHANGELOG_FIXES.md`. This file tracks work
 > from the current audit/overhaul engagement.
 
+## [Unreleased] — Single-command startup
+
+`npm start` from the repo root now boots the backend and frontend together
+via `concurrently`, instead of requiring two terminals and two `cd`s.
+
+- Root `start` / `dev` scripts added. Output is prefixed and colour-coded
+  per process (`[backend]` blue, `[frontend]` magenta) — without that, two
+  interleaved log streams in one terminal are unreadable, which is the usual
+  reason people go back to separate windows.
+- Wired with `--kill-others-on-fail`. If the backend can't boot (bad
+  `DATABASE_URL`, most often) the frontend is torn down with it. Leaving the
+  UI up against an API that never started is the worse failure mode: it
+  doesn't present as "the server is down", it presents as every page being
+  inexplicably broken.
+- Root `doctor`, `test`, `lint`, and `build` added as pass-throughs, so the
+  common commands all work from one place.
+- **The per-package scripts are untouched.** `cd backend && npm start` and
+  `cd frontend && npm start` behave exactly as before, and
+  `npm run start:backend` / `start:frontend` run them individually from the
+  root. Running the halves apart is still the better option when you want a
+  backend restart loop that doesn't disturb Vite's HMR state, or a debugger
+  attached to only one side — this adds a default, it doesn't remove a
+  workflow.
+- `install:all` now installs the root package too, since `concurrently`
+  lives there.
+
 ## [Unreleased] — Phase 11: backlog closeout (colors, DRY, coverage)
 
 Cleared three of the four "deliberate open items" carried since Phase 10.

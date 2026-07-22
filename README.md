@@ -176,21 +176,44 @@ node prisma/seed.js
 
 ### Step 5 — Start All Services
 
-Open 2 terminal windows:
+One command from the repo root starts both halves:
 
-**Terminal 1 — Backend:**
 ```bash
-cd ev-management/backend
 npm start
-# or: npm run dev   (nodemon, auto-restart)
-# Server starts on http://localhost:5000
+# [backend]  → http://localhost:5000
+# [frontend] → http://localhost:3000  (Admin at /admin/*)
 ```
 
-**Terminal 2 — Frontend (includes Admin at /admin/*):**
+Every log line is tagged with a coloured `[backend]` / `[frontend]` prefix,
+so a single terminal stays readable with both streams interleaved. `Ctrl-C`
+once stops both.
+
+It runs with `--kill-others-on-fail`: if the backend can't boot — bad
+`DATABASE_URL` is the usual reason — the frontend comes down with it. That's
+deliberate. A UI left running against an API that never started doesn't look
+like a startup failure, it looks like every page is mysteriously broken.
+
+For hot reload (nodemon + Vite HMR):
+
 ```bash
-cd ev-management/frontend
-npm start
-# App starts on http://localhost:3000
+npm run dev
+```
+
+**Prefer two terminals?** The per-package scripts are unchanged, and running
+them apart is still the better choice when you want a backend restart loop
+that doesn't disturb Vite's HMR state, or a debugger attached to just one
+side:
+
+```bash
+npm run start:backend     # or: npm run dev:backend
+npm run start:frontend    # or: npm run dev:frontend
+```
+
+...or the original way, from inside each folder:
+
+```bash
+cd ev-management/backend  && npm start   # or npm run dev
+cd ev-management/frontend && npm start
 ```
 
 ---
@@ -478,11 +501,10 @@ instead of each controller re-implementing its own ad-hoc checks.
 ## 🧪 Testing
 
 ```bash
-cd backend
-npm test
+npm test          # from the repo root
 ```
 
-54 e2e tests (Jest + Supertest, DB-free via an in-memory Prisma mock) cover
+126 tests across 9 suites (Jest + Supertest, DB-free via an in-memory Prisma mock) cover
 every core flow end-to-end — registration through auction-win through
 payment — including a genuine concurrent-request test for the booking
 race-condition path (`Promise.all`, not sequential requests — see

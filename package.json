@@ -4,15 +4,24 @@
   "description": "AI-Powered Unified EV Management System - Final Year Project",
   "scripts": {
     "setup:env": "node scripts/setup-env.mjs",
-    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "doctor": "cd backend && npm run doctor",
+    "start": "concurrently -n backend,frontend -c blue.bold,magenta.bold --kill-others-on-fail \"npm:start:backend\" \"npm:start:frontend\"",
+    "dev": "concurrently -n backend,frontend -c blue.bold,magenta.bold --kill-others-on-fail \"npm:dev:backend\" \"npm:dev:frontend\"",
     "start:backend": "cd backend && npm start",
     "start:frontend": "cd frontend && npm start",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "db:push": "cd backend && npx prisma db push",
     "db:seed": "cd backend && node prisma/seed.js",
-    "db:generate": "cd backend && npx prisma generate"
+    "db:generate": "cd backend && npx prisma generate",
+    "test": "cd backend && npm test",
+    "lint": "cd backend && npm run lint && cd ../frontend && npm run lint",
+    "build": "cd frontend && npm run build"
   },
   "author": "Final Year Project",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
 }
