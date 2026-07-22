@@ -20,7 +20,7 @@ deeper detail, see the reference docs listed in §9.*
 | **Pages** | 26 (20 public/user + 6 admin) |
 | **API** | 62 route handlers across 13 route files |
 | **Data model** | 10 Prisma models, 6 enums |
-| **Tests** | 73 passing across 5 suites |
+| **Tests** | 126 passing across 9 suites |
 | **Deployment target** | Vercel (frontend) + Render (backend) + MongoDB Atlas |
 
 ---
@@ -43,7 +43,7 @@ ev-management/
 │   ├── middleware/           auth, error, kyc, validate, validateQuery
 │   ├── utils/                15 helpers (prisma, jwt, email, stripe…)
 │   ├── prisma/               schema.prisma + seed.js
-│   ├── tests/                5 suites, 73 tests (in-memory mock DB)
+│   ├── tests/                9 suites, 126 tests (mock DB + live sockets)
 │   └── scripts/              doctor.mjs (preflight check)
 │
 ├── docs/screenshots/         Design mockups
@@ -158,7 +158,7 @@ These came up repeatedly and are worth knowing before changing things:
 
 ## 8. Current status
 
-**All automated checks pass:** 73/73 tests · ESLint clean both sides ·
+**All automated checks pass:** 126/126 tests · ESLint clean both sides ·
 frontend build succeeds · 313/313 imports resolve case-exactly · 0 backend
 vulnerabilities · no TODO/FIXME markers in source.
 
@@ -167,7 +167,6 @@ vulnerabilities · no TODO/FIXME markers in source.
    *not imported*, and Bootstrap is still fully active. The app is in a
    consistent state; the migration simply hasn't touched any page yet.
    Resume via the pilot-page approach in `PHASE_10_BOOTSTRAP_REMOVAL_PLAN.md`.
-2. **DRY / component-extraction pass** — last unfinished Phase 8.2 item.
 3. **Sentry + GA are wired but dormant** — they no-op until you supply
    `SENTRY_DSN` / `VITE_GA_MEASUREMENT_ID`.
 4. **Optional Dockerfile** — not created (Vercel/Render don't need it).
@@ -211,4 +210,4 @@ cd frontend && npm install
 npm start                       # → http://localhost:3000
 ```
 
-Verify anytime: `cd backend && npm test` → expect **73/73 passing**.
+Verify anytime: `cd backend && npm test` → expect **126/126 passing**.

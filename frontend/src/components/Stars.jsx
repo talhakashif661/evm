@@ -17,7 +17,7 @@ export function Stars({ value = 0, size = 15, count = null }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <span style={{ position: 'relative', display: 'inline-flex', lineHeight: 0 }}>
-        {row('#DDD6C8')}
+        {row('var(--star-empty)')}
         <span
           style={{
             position: 'absolute',
@@ -27,7 +27,7 @@ export function Stars({ value = 0, size = 15, count = null }) {
             whiteSpace: 'nowrap',
           }}
         >
-          {row('#96551A')}
+          {row('var(--star-filled)')}
         </span>
       </span>
       {count !== null && (
@@ -60,8 +60,8 @@ export function StarInput({ value, onChange, size = 28 }) {
           <Star
             size={size}
             strokeWidth={1.5}
-            fill={n <= value ? '#96551A' : 'none'}
-            color={n <= value ? '#96551A' : 'var(--text-muted)'}
+            fill={n <= value ? 'var(--star-filled)' : 'none'}
+            color={n <= value ? 'var(--star-filled)' : 'var(--text-muted)'}
           />
         </button>
       ))}

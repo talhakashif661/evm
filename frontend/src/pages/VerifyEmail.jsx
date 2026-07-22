@@ -181,7 +181,7 @@ export default function VerifyEmail() {
               borderRadius: 4,
               border: 'none',
               background: 'var(--primary)',
-              color: '#fff',
+              color: 'var(--on-dark)',
               fontFamily: 'Inter',
               fontWeight: 700,
               cursor: 'pointer',

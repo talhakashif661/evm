@@ -8,6 +8,7 @@ import { EmptyState } from '../components/Spinner';
 import { toPKR } from '../utils/pkr';
 import { logger } from '../utils/logger';
 import SEO from '../components/SEO';
+import Pagination from '../components/Pagination.jsx';
 
 const statusBadge = (s) => {
   const map = {
@@ -332,38 +333,12 @@ export default function UserHistory() {
               </table>
             </div>
 
-            {/* Pagination */}
-            {pagination && pagination.pages > 1 && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '16px 24px',
-                  borderTop: '1px solid var(--border)',
-                }}
-              >
-                {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 4,
-                      background: p === page ? 'var(--primary)' : 'var(--bg-elevated)',
-                      border: `1px solid ${p === page ? 'var(--primary)' : 'var(--border)'}`,
-                      color: p === page ? '#ffffff' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      fontSize: '0.82rem',
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            )}
+            <Pagination
+              page={page}
+              totalPages={pagination?.pages}
+              onChange={setPage}
+              variant="table"
+            />
           </div>
         )}
       </motion.div>

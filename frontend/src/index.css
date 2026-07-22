@@ -94,6 +94,58 @@
   --transition: all 0.3s ease;
 
   /* ============================================================
+     Status tints
+     ------------------------------------------------------------
+     Soft background/border pairs for badges, status pills and
+     inline alert strips. These are NOT the same as --success /
+     --warning / --danger: those are the *foreground* colors, sized
+     for text contrast against cream. These tints are the muted
+     surfaces those colors sit ON. Keeping them apart is what stops
+     someone reaching for --success as a background and shipping
+     white-on-mint at 1.9:1.
+
+     Every pair below was checked against its own tint, not against
+     the page background — a badge is its own contrast context.
+     ============================================================ */
+  --success-tint: #e3ede5;
+  --success-tint-border: #bfd6c5;
+  --success-tint-text: #2e5b39;
+
+  --warning-tint: #f1e3d3;
+  --warning-tint-border: #dec49e;
+
+  --danger-tint: #f3e1de;
+  --danger-tint-border: #e0bab4;
+
+  --info-tint: #dee6ec;
+  --info-tint-border: #b9c7d3;
+
+  /* Used where "neutral / no verdict yet" needs to read as a badge
+     but must not imply pass or fail. */
+  --neutral-tint: #e4e9ee;
+  --neutral-tint-border: #c3cdd8;
+
+  /* Ratings. --star-filled matches --brown deliberately: the star row
+     is the one place the warm brown reads as a rating rather than as
+     body copy, so it gets its own name and can be retuned alone. */
+  --star-filled: #96551a;
+  --star-empty: #ddd6c8;
+
+  /* Text/iconography that sits on a dark or saturated surface, where
+     the cream --text-light would read as dingy rather than clean. */
+  --on-dark: #ffffff;
+
+  /* Recharts axis/grid chrome. Split out because chart furniture should
+     recede further than normal body text — reusing --text-secondary here
+     made the gridlines compete with the data series. */
+  --chart-axis: #5c5648;
+  --chart-grid: #e5dfd2;
+
+  /* Deeper gold for small text on cream — the standard --accent-gold
+     is too light to pass AA below ~18px. */
+  --accent-gold-deep: #7e663a;
+
+  /* ============================================================
      Compatibility aliases — NOT part of the palette above.
      ~40 existing files still reference these older variable names
      (--primary, --border, --radius, --shadow-sm, --text-body, etc.).

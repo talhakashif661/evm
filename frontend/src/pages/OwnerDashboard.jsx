@@ -137,7 +137,7 @@ function ImagesPicker({ value, onChange }) {
                 height: 20,
                 borderRadius: '50%',
                 background: 'var(--danger)',
-                color: '#fff',
+                color: 'var(--on-dark)',
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: '0.7rem',
@@ -702,8 +702,8 @@ export default function OwnerDashboard() {
                                   cursor: 'pointer',
                                   fontSize: '0.72rem',
                                   fontWeight: 600,
-                                  background: '#F1E3D3',
-                                  border: '1px solid #DEC49E',
+                                  background: 'var(--warning-tint)',
+                                  border: '1px solid var(--warning-tint-border)',
                                   color: 'var(--warning)',
                                 }}
                               >
@@ -718,8 +718,8 @@ export default function OwnerDashboard() {
                                   cursor: 'pointer',
                                   fontSize: '0.72rem',
                                   fontWeight: 600,
-                                  background: '#F3E1DE',
-                                  border: '1px solid #E0BAB4',
+                                  background: 'var(--danger-tint)',
+                                  border: '1px solid var(--danger-tint-border)',
                                   color: 'var(--danger)',
                                 }}
                               >
@@ -735,8 +735,8 @@ export default function OwnerDashboard() {
                                 cursor: 'pointer',
                                 fontSize: '0.72rem',
                                 fontWeight: 600,
-                                background: '#F3E1DE',
-                                border: '1px solid #E0BAB4',
+                                background: 'var(--danger-tint)',
+                                border: '1px solid var(--danger-tint-border)',
                                 color: 'var(--danger)',
                                 display: 'inline-flex',
                                 alignItems: 'center',

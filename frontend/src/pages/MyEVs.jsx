@@ -286,8 +286,8 @@ export default function MyEVs() {
                     onClick={() => dispatch(deleteEV(ev.id))}
                     style={{
                       padding: '8px 12px',
-                      background: '#F3E1DE',
-                      border: '1px solid #E0BAB4',
+                      background: 'var(--danger-tint)',
+                      border: '1px solid var(--danger-tint-border)',
                       borderRadius: 4,
                       color: 'var(--danger)',
                       cursor: 'pointer',

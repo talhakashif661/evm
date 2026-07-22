@@ -178,7 +178,7 @@ export default function Landing() {
                 // size (0.82rem) and background (--bg-secondary), the original was
                 // 2.84:1 — verified this replacement clears 4.5:1 (4.70:1) here.
                 fontSize: '0.82rem',
-                color: '#7E663A',
+                color: 'var(--accent-gold-deep)',
                 fontWeight: 600,
               }}
             >

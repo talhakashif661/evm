@@ -144,7 +144,7 @@ export default function Profile() {
               fontFamily: 'Inter',
               fontWeight: 700,
               fontSize: '2rem',
-              color: '#fff',
+              color: 'var(--on-dark)',
               cursor: 'pointer',
               border: '3px solid var(--bg-card)',
               boxShadow: 'var(--shadow-sm)',
@@ -166,9 +166,9 @@ export default function Profile() {
               }}
             >
               {avatarBusy ? (
-                <Loader2 size={22} color="#fff" className="spin" />
+                <Loader2 size={22} color="var(--on-dark)" className="spin" />
               ) : (
-                <Camera size={20} color="#fff" />
+                <Camera size={20} color="var(--on-dark)" />
               )}
             </div>
           </div>
@@ -185,7 +185,7 @@ export default function Profile() {
               borderRadius: '50%',
               background: 'var(--primary)',
               border: '2px solid var(--bg-card)',
-              color: '#fff',
+              color: 'var(--on-dark)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

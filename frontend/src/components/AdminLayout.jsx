@@ -83,7 +83,7 @@ export default function AdminLayout() {
                 fontFamily: 'Inter',
                 fontWeight: 700,
                 fontSize: '0.9rem',
-                color: '#ffffff',
+                color: 'var(--on-dark)',
                 overflow: 'hidden',
               }}
             >

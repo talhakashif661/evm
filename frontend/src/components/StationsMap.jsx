@@ -70,7 +70,7 @@ function StationsMap({ stations }) {
                     <Stars value={s.ratingAvg} count={s.ratingCount} size={12} />
                   </div>
                 )}
-                <p style={{ fontSize: '0.82rem', color: '#555', marginBottom: 6 }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 6 }}>
                   {s.address}, {s.city}
                 </p>
                 <p style={{ fontSize: '0.82rem', marginBottom: 8 }}>{toPKR(s.pricePerKwh)}/kWh</p>

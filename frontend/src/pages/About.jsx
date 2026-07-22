@@ -127,7 +127,7 @@ export default function About() {
             fontFamily: 'Inter',
             fontWeight: 700,
             fontSize: '1.6rem',
-            color: '#fff',
+            color: 'var(--on-dark)',
           }}
         >
           TK

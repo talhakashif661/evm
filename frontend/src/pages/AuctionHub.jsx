@@ -276,8 +276,8 @@ export default function AuctionHub() {
                         key={slot.id}
                         style={{
                           padding: 12,
-                          background: '#F1E3D3',
-                          border: '1px solid #DEC49E',
+                          background: 'var(--warning-tint)',
+                          border: '1px solid var(--warning-tint-border)',
                           borderRadius: 4,
                           marginBottom: 8,
                         }}
@@ -389,8 +389,8 @@ export default function AuctionHub() {
                     onClick={() => dispatch(cancelBid(bid.id))}
                     style={{
                       padding: '6px 14px',
-                      background: '#F3E1DE',
-                      border: '1px solid #E0BAB4',
+                      background: 'var(--danger-tint)',
+                      border: '1px solid var(--danger-tint-border)',
                       borderRadius: 4,
                       color: 'var(--danger)',
                       cursor: 'pointer',

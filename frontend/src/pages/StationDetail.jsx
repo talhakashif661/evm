@@ -510,8 +510,8 @@ export default function StationDetail() {
                   style={{
                     marginBottom: 12,
                     padding: '8px 12px',
-                    background: '#F1E3D3',
-                    border: '1px solid #DEC49E',
+                    background: 'var(--warning-tint)',
+                    border: '1px solid var(--warning-tint-border)',
                     borderRadius: 4,
                   }}
                 >

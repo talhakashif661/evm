@@ -145,7 +145,7 @@ export default function Bookings() {
               fontWeight: 600,
               background: filter === s ? 'var(--gold)' : 'var(--bg-card)',
               border: `1px solid ${filter === s ? 'var(--gold)' : 'var(--border)'}`,
-              color: filter === s ? '#ffffff' : 'var(--text-secondary)',
+              color: filter === s ? 'var(--on-dark)' : 'var(--text-secondary)',
               transition: 'background-color 0.12s ease, border-color 0.12s ease',
             }}
           >
@@ -332,8 +332,8 @@ export default function Bookings() {
                         onClick={() => dispatch(cancelBooking(b.id))}
                         style={{
                           padding: '6px 14px',
-                          background: '#F3E1DE',
-                          border: '1px solid #E0BAB4',
+                          background: 'var(--danger-tint)',
+                          border: '1px solid var(--danger-tint-border)',
                           borderRadius: 4,
                           color: 'var(--danger)',
                           cursor: 'pointer',

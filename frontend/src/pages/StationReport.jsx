@@ -14,6 +14,7 @@ import { toPKR } from '../utils/pkr';
 import { logger } from '../utils/logger';
 import { Skeleton, SkeletonRow } from '../components/Skeleton';
 import SEO from '../components/SEO';
+import Pagination from '../components/Pagination.jsx';
 
 const PERIODS = ['daily', 'weekly', 'monthly', 'yearly'];
 
@@ -275,15 +276,15 @@ export default function StationReport() {
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5DFD2" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis
                   dataKey="name"
-                  tick={{ fill: '#5C5648', fontSize: 11 }}
+                  tick={{ fill: 'var(--chart-axis)', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fill: '#5C5648', fontSize: 11 }}
+                  tick={{ fill: 'var(--chart-axis)', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `Rs.${(v / 1000).toFixed(0)}k`}
@@ -292,11 +293,11 @@ export default function StationReport() {
                 <Area
                   type="monotone"
                   dataKey="revenue"
-                  stroke="#C9A96E"
+                  stroke="var(--accent-gold)"
                   strokeWidth={2}
-                  fill="#C9A96E"
+                  fill="var(--accent-gold)"
                   fillOpacity={0.16}
-                  dot={{ fill: '#C9A96E', r: 3 }}
+                  dot={{ fill: 'var(--accent-gold)', r: 3 }}
                   activeDot={{ r: 5 }}
                 />
               </AreaChart>
@@ -406,37 +407,12 @@ export default function StationReport() {
                 )}
               </tbody>
             </table>
-            {totalTablePages > 1 && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '16px 24px',
-                  borderTop: '1px solid var(--border)',
-                }}
-              >
-                {Array.from({ length: totalTablePages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setTablePage(p)}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 4,
-                      background: p === tablePage ? 'var(--primary)' : 'var(--bg-elevated)',
-                      border: `1px solid ${p === tablePage ? 'var(--primary)' : 'var(--border)'}`,
-                      color: p === tablePage ? '#ffffff' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      fontSize: '0.82rem',
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            )}
+            <Pagination
+              page={tablePage}
+              totalPages={totalTablePages}
+              onChange={setTablePage}
+              variant="table"
+            />
           </div>
         </div>
       </motion.div>

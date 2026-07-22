@@ -10,10 +10,30 @@ import SEO from '../components/SEO';
 
 // Mirrors the PaymentStatus enum in prisma/schema.prisma
 const STATUS_META = {
-  COMPLETED: { color: 'var(--success)', bg: '#E3EDE5', border: '#BFD6C5', icon: CheckCircle2 },
-  PENDING: { color: 'var(--warning)', bg: '#F1E3D3', border: '#DEC49E', icon: Clock },
-  FAILED: { color: 'var(--danger)', bg: '#F3E1DE', border: '#E0BAB4', icon: XCircle },
-  REFUNDED: { color: 'var(--info)', bg: '#DEE6EC', border: '#B9C7D3', icon: RotateCcw },
+  COMPLETED: {
+    color: 'var(--success)',
+    bg: 'var(--success-tint)',
+    border: 'var(--success-tint-border)',
+    icon: CheckCircle2,
+  },
+  PENDING: {
+    color: 'var(--warning)',
+    bg: 'var(--warning-tint)',
+    border: 'var(--warning-tint-border)',
+    icon: Clock,
+  },
+  FAILED: {
+    color: 'var(--danger)',
+    bg: 'var(--danger-tint)',
+    border: 'var(--danger-tint-border)',
+    icon: XCircle,
+  },
+  REFUNDED: {
+    color: 'var(--info)',
+    bg: 'var(--info-tint)',
+    border: 'var(--info-tint-border)',
+    icon: RotateCcw,
+  },
 };
 
 function StatusBadge({ status }) {

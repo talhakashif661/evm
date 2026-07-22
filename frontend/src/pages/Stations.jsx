@@ -10,6 +10,7 @@ import StationsMap from '../components/StationsMap';
 import { toPKR } from '../utils/pkr';
 import { Stars } from '../components/Stars';
 import SEO from '../components/SEO';
+import Pagination from '../components/Pagination.jsx';
 
 const emptyFilters = { city: '', name: '', maxPrice: '', minRating: '' };
 
@@ -157,7 +158,7 @@ export default function Stations() {
               border: 'none',
               cursor: 'pointer',
               background: view === 'list' ? 'var(--primary)' : 'var(--bg-surface)',
-              color: view === 'list' ? '#fff' : 'var(--text-secondary)',
+              color: view === 'list' ? 'var(--on-dark)' : 'var(--text-secondary)',
               fontSize: '0.82rem',
               fontWeight: 600,
             }}
@@ -176,7 +177,7 @@ export default function Stations() {
               border: 'none',
               cursor: 'pointer',
               background: view === 'map' ? 'var(--primary)' : 'var(--bg-surface)',
-              color: view === 'map' ? '#fff' : 'var(--text-secondary)',
+              color: view === 'map' ? 'var(--on-dark)' : 'var(--text-secondary)',
               fontSize: '0.82rem',
               fontWeight: 600,
             }}
@@ -274,9 +275,9 @@ export default function Stations() {
                     {hasAuction(s.slots) && (
                       <span
                         style={{
-                          background: '#F1E3D3',
+                          background: 'var(--warning-tint)',
                           color: 'var(--warning)',
-                          border: '1px solid #DEC49E',
+                          border: '1px solid var(--warning-tint-border)',
                           padding: '3px 8px',
                           borderRadius: 4,
                           fontSize: '0.7rem',
@@ -368,19 +369,19 @@ export default function Stations() {
                           borderRadius: 4,
                           background:
                             slot.status === 'AVAILABLE'
-                              ? '#E3EDE5'
+                              ? 'var(--success-tint)'
                               : slot.status === 'OCCUPIED'
-                                ? '#F3E1DE'
+                                ? 'var(--danger-tint)'
                                 : slot.auctionOpen
-                                  ? '#F1E3D3'
+                                  ? 'var(--warning-tint)'
                                   : 'var(--bg-elevated)',
                           border: `1px solid ${
                             slot.status === 'AVAILABLE'
-                              ? '#BFD6C5'
+                              ? 'var(--success-tint-border)'
                               : slot.status === 'OCCUPIED'
-                                ? '#E0BAB4'
+                                ? 'var(--danger-tint-border)'
                                 : slot.auctionOpen
-                                  ? '#DEC49E'
+                                  ? 'var(--warning-tint-border)'
                                   : 'var(--border)'
                           }`,
                           display: 'flex',
@@ -416,30 +417,12 @@ export default function Stations() {
             ))}
           </div>
 
-          {/* Pagination */}
-          {pagination && pagination.pages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 40 }}>
-              {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 4,
-                    background: p === page ? 'var(--primary)' : 'var(--bg-card)',
-                    border: `1px solid ${p === page ? 'var(--primary)' : 'var(--border)'}`,
-                    color: p === page ? '#ffffff' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: '0.88rem',
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={pagination?.pages}
+            onChange={setPage}
+            variant="standalone"
+          />
         </>
       )}
     </div>

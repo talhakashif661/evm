@@ -3,6 +3,84 @@
 > Prior engagement history lives in `CHANGELOG_FIXES.md`. This file tracks work
 > from the current audit/overhaul engagement.
 
+## [Unreleased] — Phase 11: backlog closeout (colors, DRY, coverage)
+
+Cleared three of the four "deliberate open items" carried since Phase 10.
+The fourth (Bootstrap removal) is still open **on purpose** — see the note
+at the end.
+
+### Design tokens — every hardcoded color is now in the palette
+
+80 hex literals across 20 files replaced with CSS variables. The interesting
+part wasn't the find-and-replace, it was resisting the obvious mapping:
+badge backgrounds did *not* get pointed at `--success` / `--warning` /
+`--danger`. Those are foreground colors, sized for text contrast against
+cream. The muted surfaces they sit on are a different job, so they got their
+own names (`--success-tint`, `--warning-tint-border`, …). Collapsing the two
+sets is exactly how a codebase ends up shipping white-on-mint at 1.9:1.
+
+Also added: `--star-filled` / `--star-empty` (the rating row can now be
+retuned without touching body copy that happens to share the same brown),
+`--chart-axis` / `--chart-grid` (chart furniture should recede further than
+normal text — reusing `--text-secondary` made gridlines compete with the
+data), `--on-dark`, and `--accent-gold-deep` for small gold text that the
+standard gold is too light to carry at AA.
+
+### DRY — extracted the duplicated pagination control
+
+The station grid, booking history and owner revenue table had each grown
+their own copy of the same page-number strip. Now one
+`components/Pagination.jsx` with a `variant` prop, because the differences
+between them were real (table footer with a divider rule vs. a standalone
+block with its own margin) rather than accidental drift.
+
+All three copies were also missing the same accessibility pieces — no
+landmark, no `aria-current`, and no accessible name on the buttons (a bare
+"3" tells a screen-reader user nothing). Fixed once instead of three times.
+
+### Test coverage — 73 → 126 tests, 5 → 9 suites
+
+Closed every "present but not directly tested" item from the status report:
+
+- **`verification.otp.test.js`** (12) — the OTP flow, including the branch
+  that actually flips `isVerified`. That one mattered most: KYC gates both
+  booking and station listing, so a regression there silently locks every
+  new user out of the product, and it had no assertion on it at all.
+- **`ai-recommend.test.js`** (12) — the recommendation scorer. Written
+  against ordering and relative score rather than exact numbers, so a future
+  weight tweak doesn't produce a wall of red for no reason. Includes a guard
+  that an unapproved station never surfaces — the fixture is priced at 1 and
+  sits on the user's exact coordinates, so it would top the list the moment
+  that filter regressed.
+- **`ev-slot.crud.test.js`** (18) — CRUD plus the cross-user ownership
+  guards. Every rejection test re-reads the row afterwards; a 403 that still
+  mutated the record is worse than a 200 would be, and checking the status
+  code alone can't tell those apart.
+- **`socket.realtime.test.js`** (11) — real server, real clients, real
+  loopback socket. The security assertions are the point: a client holding
+  user A's token must *not* receive user B's notifications, and a
+  client-supplied `join:user` must be ignored. A test that only checked
+  "a message arrives" would have passed against the old, broken,
+  client-driven room join too.
+
+Added `socket.io-client` as a devDependency (the server already depended on
+`socket.io`; the client half was only ever needed for this suite).
+
+### Verification
+
+126/126 tests, 9/9 suites · ESLint clean both sides · frontend production
+build succeeds.
+
+### Still open, deliberately
+
+**Bootstrap removal stays paused.** It touches ~34 files and is the one
+change in the backlog that no test, linter, or build can validate — the
+suite stays green and the build stays clean while the layout quietly falls
+apart. It needs a browser and a human eye, which is why it wasn't bundled
+into this pass. Resume via the pilot-page approach in
+`PHASE_10_BOOTSTRAP_REMOVAL_PLAN.md`: migrate one low-traffic page, look at
+it, then continue.
+
 ## [Unreleased] — Debug pass: run-on-first-try robustness
 
 Requested as a "senior debugger" pass: make the codebase run on the first

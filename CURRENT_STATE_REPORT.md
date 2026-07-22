@@ -27,7 +27,7 @@ Run just now, fresh:
 
 | Check | Result | What it proves |
 |---|---|---|
-| Backend test suite (`npm test`) | **73/73 passing, 5/5 suites** | Core booking/auction/payment/admin logic works |
+| Backend test suite (`npm test`) | **126/126 passing, 9/9 suites** | Core booking/auction/payment/admin logic works |
 | Backend ESLint | **0 problems** | No undefined vars, unused/missing imports |
 | Frontend ESLint | **0 problems** | Same, across all `.jsx` |
 | Frontend build (`npm run build`) | **succeeds** | Every `.jsx` parses & bundles — no syntax/bracket errors |
@@ -83,21 +83,13 @@ These aren't *broken* — they're just not covered by an automated test, so
 
 These are things *intentionally* not finished yet — tracked, not forgotten:
 
-1. **DRY pass / component-extraction** (Phase 8.2) — the last code-quality
-   checklist item; hasn't had its dedicated pass. Not a bug, just unfinished
-   polish.
-2. **Bootstrap removal** (Phase 10) — in progress and *deliberately paused*.
+1. **Bootstrap removal** (Phase 10) — in progress and *deliberately paused*.
    The replacement `grid.css` is written but **not imported anywhere yet**,
    and Bootstrap is **still active** (`main.jsx` still imports it). So the
    app is in a consistent state (fully on Bootstrap) — the migration simply
    hasn't started touching pages. See `PHASE_10_BOOTSTRAP_REMOVAL_PLAN.md`.
-3. **Optional Dockerfile** (Phase 8.3) — not created. Vercel/Render don't
+2. **Optional Dockerfile** (Phase 8.3) — not created. Vercel/Render don't
    need it.
-4. **~11 hardcoded hex colors** in components (star ratings, status badges
-   in `Stars.jsx`, `Stations.jsx`, `Navbar.jsx`, `OwnerDashboard.jsx`,
-   `AIRecommend.jsx`) sit outside the shared CSS-variable palette. Not
-   *wrong* — they render fine — but they're a consistency smell if you want
-   full theme centralization.
 5. **Sentry & Google Analytics are wired but dormant** — they no-op until
    you add a real `SENTRY_DSN` / `VITE_GA_MEASUREMENT_ID`. That's by design,
    but worth remembering they're not actually collecting anything yet.
@@ -129,9 +121,9 @@ These are things *intentionally* not finished yet — tracked, not forgotten:
 - **Bugs / errors / broken code right now:** none found. Every automated
   check passes.
 - **Missing data:** no orphaned/half-built code; the "missing" items are
-  the *deliberately unfinished* ones in §3 (DRY pass, Bootstrap migration,
+  the *deliberately unfinished* ones in §3 (Bootstrap migration,
   optional Dockerfile) — all tracked.
-- **Is everything working?** Everything *testable* is working (73/73). The
+- **Is everything working?** Everything *testable* is working (126/126). The
   honest caveat is that a meaningful slice of functionality (AI recommend,
   OTP happy-path, live sockets, and anything visual/browser-side) is
   verified only by code inspection, not by an automated test or a real
@@ -143,5 +135,5 @@ These are things *intentionally* not finished yet — tracked, not forgotten:
    `npm start`) — confirms the one thing this sandbox can't.
 2. Open the app in a real browser with DevTools — clears the entire
    "can't verify visually" section at once.
-3. Then, if you want: finish the DRY pass, or resume the Bootstrap
+3. Then, if you want: resume the Bootstrap
    migration with the pilot-page approach from the Phase 10 plan.

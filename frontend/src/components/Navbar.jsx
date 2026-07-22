@@ -110,9 +110,9 @@ export default function Navbar() {
                   borderRadius: 4,
                   background:
                     user?.role === 'ADMIN'
-                      ? '#F3E1DE'
+                      ? 'var(--danger-tint)'
                       : user?.role === 'STATION_OWNER'
-                        ? '#F1E3D3'
+                        ? 'var(--warning-tint)'
                         : 'var(--primary-glow)',
                   color:
                     user?.role === 'ADMIN'
@@ -120,7 +120,7 @@ export default function Navbar() {
                       : user?.role === 'STATION_OWNER'
                         ? 'var(--warning)'
                         : 'var(--primary-dark)',
-                  border: `1px solid ${user?.role === 'ADMIN' ? '#E0BAB4' : user?.role === 'STATION_OWNER' ? '#DEC49E' : 'var(--border)'}`,
+                  border: `1px solid ${user?.role === 'ADMIN' ? 'var(--danger-tint-border)' : user?.role === 'STATION_OWNER' ? 'var(--warning-tint-border)' : 'var(--border)'}`,
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
@@ -178,8 +178,8 @@ export default function Navbar() {
               <button
                 onClick={handleLogout}
                 style={{
-                  background: '#F3E1DE',
-                  border: '1px solid #E0BAB4',
+                  background: 'var(--danger-tint)',
+                  border: '1px solid var(--danger-tint-border)',
                   color: 'var(--danger)',
                   padding: '6px 14px',
                   borderRadius: 4,
@@ -285,8 +285,8 @@ export default function Navbar() {
       {token && user && !user.isVerified && (
         <div
           style={{
-            background: '#F1E3D3',
-            borderTop: '1px solid #DEC49E',
+            background: 'var(--warning-tint)',
+            borderTop: '1px solid var(--warning-tint-border)',
             padding: '7px 24px',
             display: 'flex',
             justifyContent: 'center',

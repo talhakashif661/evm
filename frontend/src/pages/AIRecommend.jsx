@@ -39,27 +39,33 @@ const ScoreBar = ({ label, value, max = 100 }) => (
 
 const labelColors = {
   EMERGENCY_PRIORITY: {
-    bg: '#F3E1DE',
+    bg: 'var(--danger-tint)',
     color: 'var(--danger)',
-    border: '#E0BAB4',
+    border: 'var(--danger-tint-border)',
     icon: AlertTriangle,
     text: 'EMERGENCY',
   },
   HIGHLY_RECOMMENDED: {
-    bg: '#E4E9EE',
+    bg: 'var(--neutral-tint)',
     color: 'var(--primary-dark)',
-    border: '#C3CDD8',
+    border: 'var(--neutral-tint-border)',
     icon: Star,
     text: 'TOP PICK',
   },
   RECOMMENDED: {
-    bg: '#E3EDE5',
-    color: '#2E5B39',
-    border: '#BFD6C5',
+    bg: 'var(--success-tint)',
+    color: 'var(--success-tint-text)',
+    border: 'var(--success-tint-border)',
     icon: CheckCircle2,
     text: 'RECOMMENDED',
   },
-  FAIR: { bg: '#DEE6EC', color: 'var(--info)', border: '#B9C7D3', icon: ThumbsUp, text: 'FAIR' },
+  FAIR: {
+    bg: 'var(--info-tint)',
+    color: 'var(--info)',
+    border: 'var(--info-tint-border)',
+    icon: ThumbsUp,
+    text: 'FAIR',
+  },
   NOT_RECOMMENDED: {
     bg: 'var(--bg-elevated)',
     color: 'var(--text-muted)',
@@ -244,8 +250,8 @@ export default function AIRecommend() {
           animate={{ opacity: 1 }}
           style={{
             padding: 16,
-            background: '#F3E1DE',
-            border: '1px solid #E0BAB4',
+            background: 'var(--danger-tint)',
+            border: '1px solid var(--danger-tint-border)',
             borderRadius: 6,
             marginBottom: 24,
           }}

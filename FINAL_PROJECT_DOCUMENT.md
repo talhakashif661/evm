@@ -54,7 +54,7 @@ What makes it more than a simple booking app:
 | Database models | 10 models, 6 enums |
 | Shared components | 16 |
 | Redux slices | 13 |
-| Tests | 73 passing, 5 suites |
+| Tests | 126 passing, 9 suites |
 | Git commits | 16 |
 
 ---
@@ -109,7 +109,7 @@ ev-management/
 │   ├── middleware/           auth, error, kyc, validate, validateQuery
 │   ├── utils/                15 helpers (prisma, jwt, email, stripe…)
 │   ├── prisma/               schema.prisma + seed.js
-│   ├── tests/                5 suites, 73 tests (in-memory mock DB)
+│   ├── tests/                9 suites, 126 tests (mock DB + live sockets)
 │   └── scripts/              doctor.mjs (preflight health check)
 │
 ├── docs/
@@ -334,7 +334,7 @@ Full chronological detail: **`CHANGELOG.md`** (most recent first).
 
 | Check | Result |
 |---|---|
-| Backend test suite | **73/73 passing, 5/5 suites** |
+| Backend test suite | **126/126 passing, 9/9 suites** |
 | Backend ESLint | **0 problems** |
 | Frontend ESLint | **0 problems** |
 | Frontend build | **succeeds** |
@@ -374,16 +374,31 @@ No live browser was available at any point in this engagement:
 
 1. **Bootstrap removal paused mid-plan** — `grid.css` is written but *not
    imported*; Bootstrap is still fully active. The app is in a consistent
-   state; the migration simply hasn't touched any page yet.
-2. **DRY / component-extraction pass** — last unfinished Phase 8.2 item.
-3. **Sentry & GA are dormant** — they no-op until you supply
+   state; the migration simply hasn't touched any page yet. This stays
+   paused on purpose: it is the only change in the backlog that no test,
+   linter, or build can validate, so it needs a browser and a human eye,
+   not another automated pass.
+2. **Sentry & GA are dormant** — they no-op until you supply
    `SENTRY_DSN` / `VITE_GA_MEASUREMENT_ID`.
-4. **Optional Dockerfile** — not created (Vercel/Render don't need it).
-5. **~11 hardcoded hex colors** in components (star ratings, status badges)
-   sit outside the shared CSS-variable palette — a consistency smell, not a
-   bug.
-6. **Frontend `esbuild`/`vite` advisory** — dev-server only, requires a
+3. **Optional Dockerfile** — not created (Vercel/Render don't need it).
+4. **Frontend `esbuild`/`vite` advisory** — dev-server only, requires a
    breaking Vite major bump, intentionally deferred.
+
+### Closed since the last revision
+
+- **Hardcoded hex colors** — all 80 literals across 20 files now resolve
+  through the CSS-variable palette. New semantic tokens were added rather
+  than mapping everything onto the existing ones: status *tints* (the muted
+  badge surfaces) are deliberately separate from `--success` / `--warning` /
+  `--danger` (the foreground colors), because collapsing the two is how you
+  end up shipping white-on-mint at 1.9:1.
+- **DRY / component extraction** — the page-number control that the station
+  grid, booking history and revenue table had each grown their own copy of
+  is now one `components/Pagination.jsx`. All three copies were missing the
+  same accessibility bits (no landmark, no `aria-current`, no accessible
+  button name); fixed once, in one place.
+- **Untested endpoints** — email OTP, AI recommendations, EV/slot CRUD and
+  live Socket.IO delivery all have suites now (see §10).
 
 ---
 
@@ -438,7 +453,7 @@ Admin panel lives at `/admin/*`.
 ### Verify anytime
 
 ```bash
-cd backend && npm test        # expect: 73/73 passing
+cd backend && npm test        # expect: 126/126 passing
 cd frontend && npm run build  # should complete cleanly
 ```
 
@@ -482,7 +497,6 @@ mobile rendering, and visual polish.
 
 ### Priority 2 — Finish the open items
 
-- **DRY pass / component extraction** — the last Phase 8.2 checklist item
 - **Bootstrap removal** — resume via the pilot-page approach in
   `PHASE_10_BOOTSTRAP_REMOVAL_PLAN.md`. Important: migrate one low-traffic
   page first and check it visually before touching the other 33 files. This
@@ -493,7 +507,6 @@ mobile rendering, and visual polish.
 
 - Add test coverage for the untested endpoints (AI recommend, OTP happy
   path, live sockets)
-- Centralize the ~11 hardcoded hex colors into CSS variables
 - Consider the Vite major-version bump to clear the `esbuild` advisory (on
   its own schedule — it's a breaking change)
 - Replace the design mockups in `docs/screenshots/` with real screenshots

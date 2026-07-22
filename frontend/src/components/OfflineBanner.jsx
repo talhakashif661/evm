@@ -32,7 +32,7 @@ export default function OfflineBanner() {
         right: 0,
         zIndex: 2000,
         background: 'var(--error)',
-        color: '#FDF8F0',
+        color: 'var(--text-light)',
         textAlign: 'center',
         padding: '9px 16px',
         fontSize: '0.85rem',

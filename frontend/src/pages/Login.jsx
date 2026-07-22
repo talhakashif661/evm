@@ -142,8 +142,8 @@ export default function Login() {
             style={{
               marginTop: 20,
               padding: '12px 16px',
-              background: '#DEE6EC',
-              border: '1px solid #B9C7D3',
+              background: 'var(--info-tint)',
+              border: '1px solid var(--info-tint-border)',
               borderRadius: 4,
               textAlign: 'center',
             }}

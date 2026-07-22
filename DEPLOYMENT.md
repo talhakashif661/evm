@@ -213,7 +213,7 @@ every file save.)
 
 **Run the test suite** (needs NO database or .env — it uses an in-memory DB):
 ```bash
-cd backend && npm test      # expected: 73/73 passing (5 suites)
+cd backend && npm test      # expected: 126/126 passing (9 suites)
 ```
 
 ---
