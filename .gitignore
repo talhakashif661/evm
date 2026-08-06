@@ -26,3 +26,15 @@ Thumbs.db
 
 # Prisma
 backend/prisma/*.db
+
+# Local project reports and presentation artifacts
+docs/
+*.pptx
+*.docx
+theme-preview.html
+PHASE_*
+*_REPORT.md
+*_SUMMARY.md
+*_AUDIT_*.md
+FINAL_PROJECT_DOCUMENT.md
+CHANGELOG_FIXES.md
