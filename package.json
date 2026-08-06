@@ -17,13 +17,11 @@
     "db:generate": "cd backend && npx prisma generate",
     "test": "cd backend && npm test",
     "lint": "cd backend && npm run lint && cd ../frontend && npm run lint",
-    "build": "cd frontend && npm run build",
-    "generate:pptx": "node scripts/generate-pptx.js"
+    "build": "cd frontend && npm run build"
   },
   "author": "Final Year Project",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^10.0.3",
-    "pptxgenjs": "^3.12.0"
+    "concurrently": "^10.0.3"
   }
 }

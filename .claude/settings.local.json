@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue)",
-      "PowerShell(cd \"d:\\\\ev managment 5 july\\\\ev-management-IMPROVED-v2\\\\ev-management\\\\backend\" ; Get-ChildItem -Recurse -Directory | Where-Object { $_.FullName -notmatch 'node_modules' } | Select-Object FullName)"
-    ]
-  }
-}
