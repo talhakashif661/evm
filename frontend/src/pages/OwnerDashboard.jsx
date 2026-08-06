@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
@@ -13,6 +13,7 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Eye,
 } from 'lucide-react';
 import {
   fetchMyStation,
@@ -21,8 +22,9 @@ import {
   openSlotAuction,
   closeSlotAuction,
 } from '../store/slices/stationSlice';
-import { StatCard, SlotStatusBadge, Modal } from '../components/Spinner';
-import { Skeleton, SkeletonRow } from '../components/Skeleton';
+import { StatCard, SlotStatusBadge, Modal, EmptyState } from '../components/Spinner';
+import { Skeleton, SkeletonRow, SkeletonTableRows } from '../components/Skeleton';
+import Pagination from '../components/Pagination.jsx';
 import api from '../utils/api';
 import { getSocket } from '../utils/socket';
 import { toast } from 'react-toastify';
@@ -31,6 +33,7 @@ import { compressImageToUnder } from '../utils/imageCompress';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { logger } from '../utils/logger';
 import SEO from '../components/SEO';
+import LiveChargingSessions from '../components/LiveChargingSessions';
 
 // Mirrors backend/controllers/station.controller.js's ALLOWED_AMENITIES —
 // keep these two lists in sync if either changes.
@@ -46,6 +49,46 @@ const ALLOWED_AMENITIES = [
 ];
 const MAX_STATION_IMAGES = 5;
 const MAX_STATION_IMAGE_BYTES = 80 * 1024;
+
+const formatBookingDate = (value) =>
+  value ? new Date(value).toLocaleDateString() : '—';
+
+const formatBookingTime = (value) =>
+  value
+    ? new Date(value).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—';
+
+// Charging-progress fields (end time, duration, energy delivered) are only
+// ever populated once a session actually finishes — before that they're not
+// missing data, they're legitimately not available yet. This picks the right
+// contextual message instead of a bare "—" dash for those two cases.
+const chargingFieldFallback = (sessionStatus) =>
+  sessionStatus === 'ACTIVE' ? 'In Progress' : 'Not Available';
+
+function BookingDetail({ label, value }) {
+  return (
+    <div className="col-12 col-sm-6">
+      <p
+        style={{
+          color: 'var(--text-muted)',
+          fontSize: '0.72rem',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </p>
+      <p style={{ color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>
+        {value ?? '—'}
+      </p>
+    </div>
+  );
+}
 
 function AmenitiesPicker({ value, onChange }) {
   const toggle = (a) => onChange(value.includes(a) ? value.filter((x) => x !== a) : [...value, a]);
@@ -185,10 +228,14 @@ function ImagesPicker({ value, onChange }) {
 
 export default function OwnerDashboard() {
   const dispatch = useDispatch();
+  const bookingDetailsRequest = useRef(0);
   const { myStation, loading } = useSelector((s) => s.stations);
   const [showCreate, setShowCreate] = useState(false);
   const [showSlot, setShowSlot] = useState(false);
   const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [bookingsPagination, setBookingsPagination] = useState(null);
   const [revenue, setRevenue] = useState(0);
   const [stationForm, setStationForm] = useState({
     name: '',
@@ -203,7 +250,16 @@ export default function OwnerDashboard() {
   const [slotForm, setSlotForm] = useState({ slotNumber: '', powerKw: '' });
   const [auctionModal, setAuctionModal] = useState(null);
   const [auctionDuration, setAuctionDuration] = useState(30);
+  const [auctionForm, setAuctionForm] = useState({
+    startingBid: '',
+    minIncrement: '',
+    reservationMinutes: 10,
+  });
   const [showEdit, setShowEdit] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
+  const [bookingDetails, setBookingDetails] = useState(null);
+  const [bookingDetailsLoading, setBookingDetailsLoading] = useState(false);
+  const [bookingDetailsError, setBookingDetailsError] = useState('');
   const [editForm, setEditForm] = useState({
     name: '',
     address: '',
@@ -220,11 +276,13 @@ export default function OwnerDashboard() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (myStation) {
-      fetchBookings();
-      fetchRevenue();
-    }
+    if (myStation) fetchRevenue();
   }, [myStation]);
+
+  useEffect(() => {
+    if (myStation) fetchBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myStation, bookingsPage]);
 
   // Live-notify the owner the instant a bid lands on one of their slots,
   // instead of them having to refresh to see auction activity.
@@ -266,15 +324,53 @@ export default function OwnerDashboard() {
   }, [dispatch]);
 
   const fetchBookings = async () => {
+    setBookingsLoading(true);
     try {
-      const res = await api.get('/stations/owner/bookings?limit=10');
+      const res = await api.get('/stations/owner/bookings', {
+        params: { page: bookingsPage, limit: 10 },
+      });
       setBookings(res.data.data || []);
+      setBookingsPagination(res.data.pagination || null);
     } catch (e) {
       // Recent-activity widget only — non-critical decoration, same as
       // fetchReviews elsewhere in this app; logged for dev visibility
       // without an intrusive toast for a secondary summary number.
       logger.error(e);
+    } finally {
+      setBookingsLoading(false);
     }
+  };
+
+  const openBookingDetails = async (bookingId) => {
+    const requestId = ++bookingDetailsRequest.current;
+    setSelectedBookingId(bookingId);
+    setBookingDetails(null);
+    setBookingDetailsError('');
+    setBookingDetailsLoading(true);
+
+    try {
+      const res = await api.get(`/stations/owner/bookings/${bookingId}`);
+      if (requestId !== bookingDetailsRequest.current) return;
+      setBookingDetails(res.data.data);
+    } catch (error) {
+      if (requestId !== bookingDetailsRequest.current) return;
+      logger.error(error);
+      setBookingDetailsError(
+        error.response?.data?.message || 'Unable to load booking details. Please try again.'
+      );
+    } finally {
+      if (requestId === bookingDetailsRequest.current) {
+        setBookingDetailsLoading(false);
+      }
+    }
+  };
+
+  const closeBookingDetails = () => {
+    bookingDetailsRequest.current += 1;
+    setSelectedBookingId(null);
+    setBookingDetails(null);
+    setBookingDetailsError('');
+    setBookingDetailsLoading(false);
   };
 
   // The dashboard used to show ChargingStation.totalRevenue directly — a
@@ -314,8 +410,11 @@ export default function OwnerDashboard() {
       return;
     try {
       const res = await api.patch(`/bookings/${bookingId}/owner-cancel`);
+      const refundAmount = res.data.data?.refundAmount;
       toast.success(
-        res.data.data?.refunded ? 'Booking cancelled and customer refunded' : 'Booking cancelled'
+        refundAmount
+          ? `Booking cancelled. ${toPKR(refundAmount)} refunded to the customer.`
+          : 'Booking cancelled'
       );
       fetchBookings();
       fetchRevenue();
@@ -341,9 +440,30 @@ export default function OwnerDashboard() {
   };
 
   const handleOpenAuction = async () => {
-    await dispatch(openSlotAuction({ slotId: auctionModal.id, durationMinutes: auctionDuration }));
-    setAuctionModal(null);
-    dispatch(fetchMyStation());
+    const startingBid = parseFloat(auctionForm.startingBid);
+    const reservationMinutes = parseInt(auctionForm.reservationMinutes);
+    if (Number.isNaN(startingBid) || startingBid <= 0) {
+      toast.error('Enter a valid starting bid price');
+      return;
+    }
+    if (Number.isNaN(reservationMinutes) || reservationMinutes <= 0) {
+      toast.error('Enter a valid slot reservation time');
+      return;
+    }
+    const res = await dispatch(
+      openSlotAuction({
+        slotId: auctionModal.id,
+        durationMinutes: auctionDuration,
+        startingBid,
+        minIncrement: auctionForm.minIncrement === '' ? undefined : parseFloat(auctionForm.minIncrement),
+        reservationMinutes,
+      })
+    );
+    if (!res.error) {
+      setAuctionModal(null);
+      setAuctionForm({ startingBid: '', minIncrement: '', reservationMinutes: 10 });
+      dispatch(fetchMyStation());
+    }
   };
 
   const handleCloseAuction = async (slotId) => {
@@ -368,8 +488,8 @@ export default function OwnerDashboard() {
   const handleEditStation = async (e) => {
     e.preventDefault();
     try {
-      await api.put('/stations/owner/mine', editForm);
-      toast.success('Station updated');
+      const res = await api.put('/stations/owner/mine', editForm);
+      toast.success(res.data?.message || 'Station updated');
       setShowEdit(false);
       dispatch(fetchMyStation());
     } catch (err) {
@@ -617,6 +737,39 @@ export default function OwnerDashboard() {
                 for another review.
               </p>
             )}
+            {myStation.status === 'APPROVED' && myStation.updateRequests?.[0]?.status === 'PENDING' && (
+              <p
+                style={{
+                  color: 'var(--warning)',
+                  fontSize: '0.82rem',
+                  marginTop: 12,
+                  marginBottom: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Hourglass size={13} /> You have a requested address/price change awaiting admin
+                approval. Your station&apos;s current details stay live until it&apos;s reviewed.
+              </p>
+            )}
+            {myStation.status === 'APPROVED' &&
+              myStation.updateRequests?.[0]?.status === 'REJECTED' && (
+                <p
+                  style={{
+                    color: 'var(--danger)',
+                    fontSize: '0.82rem',
+                    marginTop: 12,
+                    marginBottom: 0,
+                  }}
+                >
+                  Your last requested address/price change wasn&apos;t approved
+                  {myStation.updateRequests[0].adminNote
+                    ? `: "${myStation.updateRequests[0].adminNote}"`
+                    : '.'}{' '}
+                  You can submit a new request any time.
+                </p>
+              )}
           </motion.div>
 
           {/* Slots table */}
@@ -672,7 +825,13 @@ export default function OwnerDashboard() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {['AVAILABLE', 'OCCUPIED', 'MAINTENANCE'].map((s) => (
+                            {[
+                              'AVAILABLE',
+                              'OCCUPIED',
+                              'MAINTENANCE',
+                              'OFFLINE',
+                              'FAULTED',
+                            ].map((s) => (
                               <button
                                 key={s}
                                 onClick={() => handleUpdateSlotStatus(slot.id, s)}
@@ -695,7 +854,14 @@ export default function OwnerDashboard() {
                             ))}
                             {!slot.auctionOpen ? (
                               <button
-                                onClick={() => setAuctionModal(slot)}
+                                onClick={() => {
+                                  setAuctionModal(slot);
+                                  setAuctionForm({
+                                    startingBid: '',
+                                    minIncrement: '',
+                                    reservationMinutes: 10,
+                                  });
+                                }}
                                 style={{
                                   padding: '4px 10px',
                                   borderRadius: 4,
@@ -755,6 +921,15 @@ export default function OwnerDashboard() {
             )}
           </motion.div>
 
+          <LiveChargingSessions
+            stationId={myStation.id}
+            onSessionStopped={() => {
+              fetchBookings();
+              fetchRevenue();
+              dispatch(fetchMyStation());
+            }}
+          />
+
           {/* Recent bookings */}
           <motion.div className="ev-card" style={{ padding: 24 }}>
             <h3
@@ -768,37 +943,49 @@ export default function OwnerDashboard() {
             >
               Recent Bookings
             </h3>
-            {bookings.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
-                No bookings yet
-              </p>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table className="ev-table">
-                  <thead>
+            <div className="table-scroll">
+              <table className="ev-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>EV</th>
+                    <th>Slot</th>
+                    <th>Date</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Status</th>
+                    <th>Cost</th>
+                    <th>Payment</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookingsLoading ? (
+                    <SkeletonTableRows rows={5} columns={10} />
+                  ) : bookings.length === 0 ? (
                     <tr>
-                      <th>User</th>
-                      <th>EV</th>
-                      <th>Slot</th>
-                      <th>Time</th>
-                      <th>Status</th>
-                      <th>Cost</th>
-                      <th>Payment</th>
-                      <th>Action</th>
+                      <td colSpan={10}>
+                        <EmptyState title="No Records Found" subtitle="No bookings yet." />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {bookings.map((b) => (
+                  ) : (
+                    bookings.map((b) => (
                       <tr key={b.id}>
                         <td>{b.user?.name}</td>
                         <td>{b.ev?.model}</td>
                         <td>#{b.slot?.slotNumber}</td>
                         <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          {new Date(b.startTime).toLocaleDateString()}
+                          {formatBookingDate(b.startTime)}
+                        </td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {formatBookingTime(b.startTime)}
+                        </td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {formatBookingTime(b.endTime || b.plannedEndTime)}
                         </td>
                         <td>
                           <span
-                            className={`badge-${b.status === 'COMPLETED' ? 'gold' : b.status === 'CANCELLED' ? 'danger' : 'info'}`}
+                            className={`badge-${b.status === 'COMPLETED' ? 'success' : b.status === 'CANCELLED' ? 'cancelled' : 'info'}`}
                           >
                             {b.status}
                           </span>
@@ -823,6 +1010,23 @@ export default function OwnerDashboard() {
                           )}
                         </td>
                         <td style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            type="button"
+                            className="btn-outline"
+                            aria-label={`View booking ${b.id}`}
+                            title="View booking details"
+                            style={{
+                              minHeight: 0,
+                              padding: '5px 10px',
+                              fontSize: '0.72rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            onClick={() => openBookingDetails(b.id)}
+                          >
+                            <Eye size={12} aria-hidden="true" /> View
+                          </button>
                           {b.status === 'ACTIVE' && (
                             <button
                               className="btn-success-sm"
@@ -833,7 +1037,7 @@ export default function OwnerDashboard() {
                           )}
                           {['CONFIRMED', 'CHECKED_IN', 'ACTIVE'].includes(b.status) && (
                             <button
-                              className="btn-danger-sm"
+                              className="btn-danger-sm btn-cancel"
                               onClick={() => handleOwnerCancelBooking(b.id)}
                             >
                               Cancel
@@ -841,14 +1045,229 @@ export default function OwnerDashboard() {
                           )}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={bookingsPage}
+              totalPages={bookingsPagination?.pages}
+              onChange={setBookingsPage}
+              variant="table"
+              total={bookingsPagination?.total}
+              limit={10}
+            />
           </motion.div>
         </>
       )}
+
+      <Modal
+        show={!!selectedBookingId}
+        onClose={closeBookingDetails}
+        title="Booking Details"
+      >
+        {bookingDetailsLoading && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              minHeight: 180,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              color: 'var(--text-muted)',
+            }}
+          >
+            <Loader2 size={18} className="spin" aria-hidden="true" />
+            Loading booking details...
+          </div>
+        )}
+
+        {!bookingDetailsLoading && bookingDetailsError && (
+          <div role="alert" style={{ textAlign: 'center', padding: '24px 0' }}>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 14 }}>
+              {bookingDetailsError}
+            </p>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => openBookingDetails(selectedBookingId)}
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!bookingDetailsLoading && !bookingDetailsError && bookingDetails && (
+          <div>
+            <div
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: 16,
+                marginBottom: 20,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: 3 }}>
+                  Session ID
+                </p>
+                <p
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    margin: 0,
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {bookingDetails.sessionId}
+                </p>
+              </div>
+              <span
+                className={`badge-${
+                  bookingDetails.sessionStatus === 'COMPLETED'
+                    ? 'gold'
+                    : bookingDetails.sessionStatus === 'CANCELLED' ||
+                        bookingDetails.sessionStatus === 'EMERGENCY_STOPPED'
+                      ? 'danger'
+                      : 'info'
+                }`}
+              >
+                {bookingDetails.sessionStatus?.replaceAll('_', ' ')}
+              </span>
+            </div>
+
+            <h4 style={{ fontSize: '1rem', marginBottom: 14 }}>General</h4>
+            <div className="row g-3 mb-4">
+              <BookingDetail label="Session ID" value={bookingDetails.sessionId} />
+              <BookingDetail label="Booking ID" value={bookingDetails.id} />
+              <BookingDetail label="User Name" value={bookingDetails.user?.name} />
+              <BookingDetail label="EV Model" value={bookingDetails.ev?.model} />
+              <BookingDetail label="Slot Number" value={bookingDetails.slot?.slotNumber} />
+            </div>
+
+            <h4 style={{ fontSize: '1rem', marginBottom: 14 }}>Charging</h4>
+            <div className="row g-3 mb-4">
+              <BookingDetail
+                label="Date"
+                value={formatBookingDate(bookingDetails.sessionStartTime)}
+              />
+              <BookingDetail
+                label="Start Time"
+                value={formatBookingTime(bookingDetails.sessionStartTime)}
+              />
+              <BookingDetail
+                label="End Time"
+                value={
+                  bookingDetails.sessionEndTime
+                    ? formatBookingTime(bookingDetails.sessionEndTime)
+                    : chargingFieldFallback(bookingDetails.sessionStatus)
+                }
+              />
+              <BookingDetail
+                label="Duration"
+                value={
+                  bookingDetails.sessionDurationMinutes != null
+                    ? `${bookingDetails.sessionDurationMinutes} minutes`
+                    : chargingFieldFallback(bookingDetails.sessionStatus)
+                }
+              />
+              <BookingDetail
+                label="Energy Delivered"
+                value={
+                  bookingDetails.energyDeliveredKwh != null
+                    ? `${bookingDetails.energyDeliveredKwh} kWh`
+                    : chargingFieldFallback(bookingDetails.sessionStatus)
+                }
+              />
+            </div>
+
+            <h4 style={{ fontSize: '1rem', marginBottom: 14 }}>Financial</h4>
+            <div className="row g-3 mb-4">
+              <BookingDetail
+                label="Price per kWh"
+                value={
+                  bookingDetails.pricePerKwh != null
+                    ? `${toPKR(bookingDetails.pricePerKwh)}/kWh`
+                    : '—'
+                }
+              />
+              <BookingDetail
+                label="Total Amount"
+                value={
+                  bookingDetails.totalAmount != null
+                    ? toPKR(bookingDetails.totalAmount)
+                    : 'Pending'
+                }
+              />
+              <BookingDetail
+                label="Payment Status"
+                value={
+                  bookingDetails.payment?.status ||
+                  (bookingDetails.status === 'CANCELLED' ? 'Not Available' : 'Pending')
+                }
+              />
+            </div>
+
+            <h4 style={{ fontSize: '1rem', marginBottom: 14 }}>Status</h4>
+            <div className="row g-3">
+              <BookingDetail
+                label="Session Status"
+                value={bookingDetails.sessionStatus?.replaceAll('_', ' ')}
+              />
+            </div>
+
+            {bookingDetails.sessionStatus === 'EMERGENCY_STOPPED' && (
+              <>
+                <h4 style={{ fontSize: '1rem', marginTop: 20, marginBottom: 14 }}>
+                  Incident Information
+                </h4>
+                <div className="row g-3">
+                  <BookingDetail label="Status" value="🟠 Emergency Stopped" />
+                  <BookingDetail
+                    label="Stopped By"
+                    value={bookingDetails.emergencyStoppedByName}
+                  />
+                  <BookingDetail label="Reason" value={bookingDetails.emergencyReason} />
+                  <BookingDetail
+                    label="Energy Delivered Before Stop"
+                    value={
+                      bookingDetails.finalEnergyKwh != null
+                        ? `${bookingDetails.finalEnergyKwh} kWh`
+                        : 'Not Available'
+                    }
+                  />
+                  <BookingDetail
+                    label="Charging Duration Before Stop"
+                    value={
+                      bookingDetails.durationMinutes != null
+                        ? `${bookingDetails.durationMinutes} minutes`
+                        : 'Not Available'
+                    }
+                  />
+                  <BookingDetail
+                    label="Amount Charged Before Stop"
+                    value={
+                      bookingDetails.finalBill != null
+                        ? toPKR(bookingDetails.finalBill)
+                        : 'Not Available'
+                    }
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Create station modal */}
       <Modal
@@ -1002,6 +1421,22 @@ export default function OwnerDashboard() {
               required
             />
           </div>
+          {myStation?.status === 'APPROVED' && (
+            <p
+              style={{
+                fontSize: '0.78rem',
+                color: 'var(--text-muted)',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                padding: '8px 12px',
+                marginBottom: 16,
+              }}
+            >
+              Your station is live, so address, city, coordinates, and price changes below are
+              submitted to the admin for approval instead of applying instantly.
+            </p>
+          )}
           <div className="mb-3">
             <label className="form-label" htmlFor="edit-address">
               Address
@@ -1162,8 +1597,66 @@ export default function OwnerDashboard() {
       >
         <div>
           <p style={{ color: 'var(--text-muted)', marginBottom: 20, fontSize: '0.9rem' }}>
-            Set auction duration. The highest priority bid wins.
+            Set the starting price and duration. The highest priority bid wins.
           </p>
+          <div className="mb-3">
+            <label className="form-label" htmlFor="auction-starting-bid">
+              Starting Bid Price
+            </label>
+            <input
+              id="auction-starting-bid"
+              type="number"
+              className="form-control"
+              placeholder="e.g. 500"
+              step="0.01"
+              min="0.01"
+              value={auctionForm.startingBid}
+              onChange={(e) => setAuctionForm({ ...auctionForm, startingBid: e.target.value })}
+              required
+            />
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              EV users can only bid at or above this amount
+            </small>
+          </div>
+          <div className="mb-3">
+            <label className="form-label" htmlFor="auction-min-increment">
+              Minimum Bid Increment (optional)
+            </label>
+            <input
+              id="auction-min-increment"
+              type="number"
+              className="form-control"
+              placeholder="e.g. 50"
+              step="0.01"
+              min="0"
+              value={auctionForm.minIncrement}
+              onChange={(e) => setAuctionForm({ ...auctionForm, minIncrement: e.target.value })}
+            />
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Once there&apos;s a leading bid, a new bid must beat it by at least this much
+            </small>
+          </div>
+          <div className="mb-3">
+            <label className="form-label" htmlFor="auction-reservation-minutes">
+              Slot Reservation Time (minutes)
+            </label>
+            <input
+              id="auction-reservation-minutes"
+              type="number"
+              className="form-control"
+              placeholder="e.g. 10"
+              min="1"
+              max="1440"
+              value={auctionForm.reservationMinutes}
+              onChange={(e) =>
+                setAuctionForm({ ...auctionForm, reservationMinutes: e.target.value })
+              }
+              required
+            />
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              How long the winner has to check in before it&apos;s offered to the next bidder
+            </small>
+          </div>
           <div className="mb-4">
             <label className="form-label" htmlFor="auction-duration">
               Duration:{' '}

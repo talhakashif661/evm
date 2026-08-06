@@ -45,7 +45,7 @@ export default function About() {
     >
       <SEO
         title="About Us"
-        description="Learn about ChargeEV's mission to make EV charging simple, transparent, and reliable — real-time booking, AI recommendations, and priority auctions."
+        description="Learn about Unified EV's mission to make EV charging simple, transparent, and reliable — real-time booking, AI recommendations, and priority auctions."
       />
       {/* Intro */}
       <motion.div
@@ -54,10 +54,10 @@ export default function About() {
         style={{ textAlign: 'center', marginBottom: 44 }}
       >
         <h1 className="section-title" style={{ justifyContent: 'center' }}>
-          About <span>ChargeEV</span>
+          About <span>Unified EV</span>
         </h1>
         <p style={{ color: 'var(--text-secondary)', maxWidth: 640, margin: '0 auto' }}>
-          ChargeEV is a marketplace that connects EV drivers with charging station owners across
+          Unified EV is a marketplace that connects EV drivers with charging station owners across
           Pakistan — real-time slot booking, transparent PKR pricing, slot auctions, and an admin
           layer that keeps every station and payment honest.
         </p>
@@ -176,7 +176,7 @@ export default function About() {
             <Phone size={15} /> Call
           </a>
           <a
-            href={waLink(CONTACT.phone, 'Hi Talha! Found you through ChargeEV.')}
+            href={waLink(CONTACT.phone, 'Hi Talha! Found you through Unified EV.')}
             target="_blank"
             rel="noreferrer"
             className="btn-outline"

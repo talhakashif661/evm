@@ -69,23 +69,15 @@ You need a free cloud MongoDB database. This takes 5 minutes.
 
 ---
 
-## Step 3 — Get a SendGrid API Key (for email/OTP)
+## Step 3 — Configure Gmail SMTP (for email/OTP)
 
-The system sends OTP/booking/reset emails through **SendGrid's HTTPS API**
-(not Gmail SMTP — most free hosting tiers, including Render's, block
-outbound SMTP ports, so an API-based sender is what actually works in
-production).
+The system sends OTP, booking, and password-reset emails through Nodemailer
+and Gmail SMTP.
 
-1. Sign up free at **https://signup.sendgrid.com** (100 emails/day on the free tier)
-2. **Settings** (left sidebar) → **Sender Authentication** → verify the email
-   address you'll send from (Single Sender Verification is enough — you
-   don't need a custom domain). This has to match `EMAIL_FROM` below, or
-   every send fails with a 403.
-3. **Settings** → **API Keys** → **Create API Key** → choose **Restricted
-   Access** → turn on **Mail Send** → **Create & View**
-4. Copy the key (starts with `SG.`) — SendGrid only shows it once
-
-> If you don't want email right now, you can skip this and the app still works — leave `SENDGRID_API_KEY` empty and OTP sending will just log a warning and be skipped, nothing crashes.
+1. Enable 2-Step Verification on the Gmail account.
+2. Open Google Account → Security → App Passwords.
+3. Generate an app password for Mail.
+4. Put the generated app password in `SMTP_PASS`; never use the normal Gmail password.
 
 ---
 
@@ -111,9 +103,13 @@ NODE_ENV="development"
 # ─── Frontend URL for CORS (admin is merged into this same app) ────
 CLIENT_URL="http://localhost:3000"
 
-# ─── SendGrid (from Step 3) ──────────────────────────────────
-SENDGRID_API_KEY="SG.xxxxxxxxxxxxxxxxxxxxxxxx"
-EMAIL_FROM="EV Management <your-verified-sender@example.com>"
+# ─── Gmail SMTP (from Step 3) ────────────────────────────────
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_SECURE="false"
+SMTP_USER="your-address@gmail.com"
+SMTP_PASS="your-google-app-password"
+EMAIL_FROM="EV Management <your-address@gmail.com>"
 
 # ─── OTP Settings ───────────────────────────────────────────
 OTP_EXPIRY_MINUTES=10
@@ -132,8 +128,11 @@ RESEND_COOLDOWN_SECONDS=60
 | `PORT` | Which port the backend runs on | `5000` |
 | `NODE_ENV` | Environment mode | `development` |
 | `CLIENT_URL` | URL of your frontend, admin included (CORS whitelist) | `http://localhost:3000` |
-| `SENDGRID_API_KEY` | API key from SendGrid (Settings → API Keys), "Mail Send" permission | `SG.xxxxxxxxxxxxxxxx` |
-| `EMAIL_FROM` | Display name + sender address — must be a **verified sender** in SendGrid | `EV Management <noreply@...>` |
+| `SMTP_HOST` | SMTP server hostname | `smtp.gmail.com` |
+| `SMTP_PORT` | SMTP submission port | `587` |
+| `SMTP_USER` | Gmail address used to send mail | `your-address@gmail.com` |
+| `SMTP_PASS` | Google App Password (not the normal account password) | `xxxx xxxx xxxx xxxx` |
+| `EMAIL_FROM` | Display name and sender address | `EV Management <your-address@gmail.com>` |
 | `OTP_EXPIRY_MINUTES` | How long the OTP code is valid | `10` |
 | `MAX_VERIFICATION_ATTEMPTS` | Wrong OTP attempts before block | `3` |
 | `VERIFICATION_BLOCK_HOURS` | How long blocked after 3 wrong attempts | `1` |
@@ -242,7 +241,7 @@ After everything is running, test this flow:
 | `Authentication failed` (MongoDB) | Wrong password in DATABASE_URL | Check you replaced `<password>` correctly |
 | `CORS error` in browser | CLIENT_URL wrong in .env | Make sure `CLIENT_URL=http://localhost:3000` in backend `.env` |
 | `prisma generate` fails | Node version too old | Update Node.js to v18+ from nodejs.org |
-| OTP email not received | Missing/invalid `SENDGRID_API_KEY`, or `EMAIL_FROM` isn't a verified sender | Check backend logs for the SendGrid error; re-verify the sender in SendGrid → Sender Authentication |
+| OTP email not received | Missing/invalid Gmail App Password or SMTP blocked by the host | Check `SMTP_*` values and backend logs; use a host such as Railway that permits outbound SMTP |
 | `Port 5000 already in use` | Another app using port 5000 | Change `PORT=5001` in backend `.env` AND `VITE_API_URL=http://localhost:5001/api` in both frontend `.env` files |
 | Admin login rejected | Role not set to ADMIN | Update role in MongoDB Atlas collections |
 

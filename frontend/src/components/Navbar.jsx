@@ -6,8 +6,13 @@ import { Menu, X, ArrowRight, Zap } from 'lucide-react';
 import { logoutUser } from '../store/slices/authSlice';
 
 const Logo = () => (
-  <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+  <Link
+    to="/"
+    className="navbar-brand"
+    style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}
+  >
     <div
+      className="navbar-brand-mark"
       style={{
         width: 38,
         height: 38,
@@ -22,6 +27,7 @@ const Logo = () => (
       <Zap size={19} color="var(--primary)" fill="var(--primary)" strokeWidth={1} />
     </div>
     <span
+      className="navbar-brand-text"
       style={{
         fontFamily: 'Georgia, "Times New Roman", serif',
         fontWeight: 700,
@@ -30,7 +36,7 @@ const Logo = () => (
         letterSpacing: '0.02em',
       }}
     >
-      Charge<span style={{ color: 'var(--accent-gold)' }}>EV</span>
+      Unified <span style={{ color: 'var(--accent-gold)' }}>EV</span>
     </span>
   </Link>
 );
@@ -53,12 +59,14 @@ export default function Navbar() {
     ['/bookings', 'Bookings'],
     ['/payments', 'Payments'],
     ['/history', 'History'],
+    ['/analytics', 'Usage Analytics'],
     ['/evs', 'My EVs'],
     ['/auction', 'Auction'],
   ];
   const ownerLinks = [
     ['/dashboard', 'Dashboard'],
     ['/owner/station', 'My Station'],
+    ['/owner/auctions', 'Auctions'],
     ['/owner/reports', 'Reports'],
   ];
   const adminLinks = [
@@ -103,34 +111,9 @@ export default function Navbar() {
         >
           {token ? (
             <>
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  padding: '3px 10px',
-                  borderRadius: 4,
-                  background:
-                    user?.role === 'ADMIN'
-                      ? 'var(--danger-tint)'
-                      : user?.role === 'STATION_OWNER'
-                        ? 'var(--warning-tint)'
-                        : 'var(--primary-glow)',
-                  color:
-                    user?.role === 'ADMIN'
-                      ? 'var(--danger)'
-                      : user?.role === 'STATION_OWNER'
-                        ? 'var(--warning)'
-                        : 'var(--primary-dark)',
-                  border: `1px solid ${user?.role === 'ADMIN' ? 'var(--danger-tint-border)' : user?.role === 'STATION_OWNER' ? 'var(--warning-tint-border)' : 'var(--border)'}`,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                {user?.role?.replace('_', ' ')}
-              </span>
-
               <Link
                 to="/profile"
+                className="navbar-user"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -141,41 +124,11 @@ export default function Navbar() {
                   fontWeight: 600,
                 }}
               >
-                {user?.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt=""
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '1px solid var(--border-hover)',
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      background: 'var(--primary-glow)',
-                      color: 'var(--primary-dark)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontFamily: 'Inter',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    {user?.name?.[0]?.toUpperCase()}
-                  </span>
-                )}
                 {user?.name?.split(' ')[0]}
               </Link>
 
               <button
+                className="navbar-logout"
                 onClick={handleLogout}
                 style={{
                   background: 'var(--danger-tint)',

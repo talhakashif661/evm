@@ -91,9 +91,9 @@ export const createPaymentIntent = createAsyncThunk(
 // utils/stripe.js's isMockPayments), never a client-reported "I paid".
 export const fetchPayments = createAsyncThunk(
   'bookings/fetchPayments',
-  async (_, { rejectWithValue }) => {
+  async ({ page = 1, limit = 10 } = {}, { rejectWithValue }) => {
     try {
-      const res = await api.get('/payments/history');
+      const res = await api.get('/payments/history', { params: { page, limit } });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message);
@@ -110,6 +110,7 @@ const bookingSlice = createSlice({
     error: null,
     payments: [],
     paymentsLoading: false,
+    paymentsPagination: null,
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -173,6 +174,7 @@ const bookingSlice = createSlice({
       .addCase(fetchPayments.fulfilled, (state, action) => {
         state.paymentsLoading = false;
         state.payments = action.payload.data;
+        state.paymentsPagination = action.payload.pagination || null;
       })
       .addCase(fetchPayments.rejected, (state, action) => {
         state.paymentsLoading = false;

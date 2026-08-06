@@ -3,6 +3,8 @@ import { sendEmail, emailTemplates } from '../utils/email.js';
 import { expireAllStaleBookings } from '../utils/bookingExpiry.js';
 import { getIO } from '../utils/socket.js';
 import { audit } from '../utils/audit.js';
+import { finalizeAuctionWinConfirmed } from '../utils/auctionExpiry.js';
+import logger from '../utils/logger.js';
 import stripe, {
   toStripeAmount,
   STRIPE_CURRENCY,
@@ -10,6 +12,7 @@ import stripe, {
   MOCK_PAYMENT_DELAY_MS,
 } from '../utils/stripe.js';
 import { activateBookingPayment } from '../utils/paymentActivation.js';
+import { clampBattery, estimateBatteryAfter } from '../utils/battery.js';
 
 // Bookings are TIME WINDOWS [startTime, plannedEndTime) instead of an
 // open-ended lock on the slot. That means several users can book the SAME
@@ -22,9 +25,11 @@ import { activateBookingPayment } from '../utils/paymentActivation.js';
 //
 // Every booking now flows: CONFIRMED -> CHECKED_IN -> ACTIVE -> COMPLETED.
 // Windowed bookings have NO_SHOW_MINUTES after startTime to check in (else
-// auto-cancelled); open-ended ones get a much longer AUCTION_WIN_GRACE_HOURS
-// from creation instead, since they have no scheduled start to be late for
-// (see utils/bookingExpiry.js). Either way, once checked in the customer has
+// auto-cancelled); auction wins instead carry their own reservationDeadline,
+// set from the station owner's configured Slot Reservation Time when the
+// auction was opened — miss it and the reservation cascades to the
+// next-ranked bidder instead of just releasing the slot (see
+// utils/auctionExpiry.js). Either way, once checked in the customer has
 // PAYMENT_GRACE_MINUTES to pay (else auto-cancelled). totalCost is locked in
 // at check-in — from the originally-selected duration for windowed bookings,
 // or from the winning bid amount as-is for auction wins (the bid was never
@@ -34,6 +39,8 @@ import { activateBookingPayment } from '../utils/paymentActivation.js';
 
 const NO_SHOW_MINUTES = parseInt(process.env.NO_SHOW_MINUTES || '15');
 const PAYMENT_GRACE_MINUTES = parseInt(process.env.PAYMENT_GRACE_MINUTES || '5');
+
+const round = (value) => Number(value.toFixed(2));
 
 const LIVE = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'ACTIVE'];
 
@@ -101,7 +108,7 @@ export const createBooking = async (req, res, next) => {
     // A RESERVED slot just means someone is booked *right now* — a future
     // window on the same slot is exactly what this feature enables, so only
     // hard physical states block booking outright.
-    if (['MAINTENANCE', 'OCCUPIED'].includes(slot.status)) {
+    if (['MAINTENANCE', 'OFFLINE', 'FAULTED', 'OCCUPIED'].includes(slot.status)) {
       return res.status(400).json({
         success: false,
         message: `Slot is currently ${slot.status.toLowerCase()} — please pick another slot`,
@@ -301,9 +308,10 @@ export const checkIn = async (req, res, next) => {
 
     // Windowed bookings must be claimed within NO_SHOW_MINUTES of their
     // scheduled start (checked defensively here too, in case the periodic
-    // sweep hasn't caught up yet). Open-ended (auction-win) bookings have no
-    // scheduled window to be late for — their own, much longer grace period
-    // is enforced by the background sweep instead (utils/bookingExpiry.js).
+    // sweep hasn't caught up yet). Auction-win bookings instead carry their
+    // own per-auction reservationDeadline (set from the station owner's
+    // configured Slot Reservation Time) — past it, the reservation cascades
+    // to the next-ranked bidder (utils/auctionExpiry.js's expireAuctionReservations).
     if (booking.plannedEndTime) {
       const noShowCutoff = new Date(
         new Date(booking.startTime).getTime() + NO_SHOW_MINUTES * 60 * 1000
@@ -313,14 +321,26 @@ export const checkIn = async (req, res, next) => {
           .status(400)
           .json({ success: false, message: 'The check-in window for this booking has expired' });
       }
+    } else if (booking.reservationDeadline && new Date() > new Date(booking.reservationDeadline)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your reservation window has expired and the slot was offered to the next bidder',
+      });
     }
 
     let actualEvId = booking.evId;
+    let chargingEv;
     if (evId && evId !== booking.evId) {
       const ev = await prisma.eV.findFirst({ where: { id: evId, userId: req.user.id } });
       if (!ev) return res.status(404).json({ success: false, message: 'EV not found' });
       actualEvId = evId;
+      chargingEv = ev;
+    } else {
+      chargingEv = await prisma.eV.findUnique({ where: { id: booking.evId } });
     }
+    // Snapshot the charging EV's current battery % — this is what Usage
+    // Analytics later compares against batteryAfter to show battery gained.
+    const batteryBefore = chargingEv ? clampBattery(chargingEv.batteryPercentage) : null;
 
     // Windowed bookings: lock in cost from the originally-selected duration.
     // Auction wins: the winning bid, already stored as totalCost when the
@@ -336,16 +356,33 @@ export const checkIn = async (req, res, next) => {
       : booking.totalCost;
 
     const now = new Date();
-    const updated = await prisma.booking.update({
-      where: { id: req.params.id },
+    // Guard the write as well as the read. If the no-show transaction claims
+    // this row between lookup and write, check-in cannot resurrect it.
+    const claimed = await prisma.booking.updateMany({
+      where: { id: req.params.id, userId: req.user.id, status: 'CONFIRMED' },
       data: {
         status: 'CHECKED_IN',
         checkInTime: now,
         actualEvId,
         paymentDeadline: new Date(now.getTime() + PAYMENT_GRACE_MINUTES * 60 * 1000),
         totalCost,
+        batteryBefore,
       },
     });
+    if (claimed.count !== 1) {
+      return res
+        .status(409)
+        .json({ success: false, message: 'The check-in window for this booking has expired' });
+    }
+    const updated = await prisma.booking.findUnique({ where: { id: req.params.id } });
+
+    // Auction win, now confirmed in time — the auction is fully resolved, so
+    // every other ranked bidder still waiting as a backup is finalized LOST.
+    if (booking.reservationDeadline) {
+      finalizeAuctionWinConfirmed(booking.slotId).catch((err) =>
+        logger.error(`Failed to finalize auction backups for slot ${booking.slotId}:`, err.message)
+      );
+    }
 
     getIO()
       ?.to(`slot:${booking.slotId}`)
@@ -468,7 +505,7 @@ export const completeBooking = async (req, res, next) => {
   try {
     const booking = await prisma.booking.findUnique({
       where: { id: req.params.id },
-      include: { slot: { include: { station: true } }, ev: true },
+      include: { slot: { include: { station: true } }, ev: true, actualEv: true },
     });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -517,10 +554,35 @@ export const completeBooking = async (req, res, next) => {
       );
     }
 
+    // Persisted (not just returned in the response below) so the owner's
+    // Session Details view — and anything else reading the booking later —
+    // has real duration/energy figures for every completed session, not
+    // just ones that went through the emergency-stop path (the only other
+    // place these two columns were ever written before this fix).
+    const durationMinutes = Math.round(durationHours * 60);
+    const finalEnergyKwh = parseFloat(energyUsed.toFixed(2));
+
+    // Estimate battery gained from energy delivered vs. the EV's rated
+    // capacity (no real telemetry exists — see utils/battery.js), then
+    // reflect it back onto the EV so "My EVs" shows an up-to-date level.
+    const chargingEv = booking.actualEv || booking.ev;
+    const batteryAfter = estimateBatteryAfter(booking.batteryBefore, finalEnergyKwh, chargingEv?.batteryCapacity);
+
     await prisma.booking.update({
       where: { id: req.params.id },
-      data: { status: 'COMPLETED', endTime, totalCost, overageAmount },
+      data: {
+        status: 'COMPLETED',
+        endTime,
+        totalCost,
+        overageAmount,
+        durationMinutes,
+        finalEnergyKwh,
+        batteryAfter,
+      },
     });
+    if (batteryAfter != null && chargingEv) {
+      await prisma.eV.update({ where: { id: chargingEv.id }, data: { batteryPercentage: batteryAfter } });
+    }
 
     await syncSlotStatus(booking.slotId);
     getIO()
@@ -546,6 +608,15 @@ export const completeBooking = async (req, res, next) => {
  * paid, this issues a Stripe refund and symmetrically decrements the
  * station's totalRevenue (the exact gap flagged when revenue-crediting was
  * moved to payment time — refunds now exist, so it's no longer hypothetical).
+ *
+ * An ACTIVE booking is mid-charge, not just reserved — totalCost was paid
+ * upfront for the *whole* window, so cancelling it isn't "nothing happened":
+ * refunding the full amount would hand back energy the customer already
+ * drew. Only the unused remainder (totalCost minus what actual elapsed
+ * charging time has billed so far) is refunded here, same computation and
+ * same reasoning as the emergency-stop path in chargingSession.controller.js.
+ * CONFIRMED/CHECKED_IN bookings never started charging, so those still get a
+ * full refund.
  */
 export const ownerCancelBooking = async (req, res, next) => {
   try {
@@ -574,25 +645,68 @@ export const ownerCancelBooking = async (req, res, next) => {
         .json({ success: false, message: 'Booking cannot be cancelled in its current state' });
     }
 
+    const wasCharging = booking.status === 'ACTIVE';
+    const endTime = new Date();
+    let usage = null;
+    if (wasCharging) {
+      const startedAt = new Date(
+        booking.chargingStartedAt || booking.checkInTime || booking.startTime
+      );
+      const durationHours = Math.max((endTime - startedAt) / 3600000, 0);
+      const finalEnergyKwh = round(durationHours * (booking.slot.powerKw || 0));
+      const ratePerKwh = booking.ratePerKwh ?? booking.slot.station.pricePerKwh;
+      usage = {
+        durationMinutes: Math.round(durationHours * 60),
+        finalEnergyKwh,
+        finalBill: round(finalEnergyKwh * ratePerKwh),
+        ratePerKwh,
+      };
+    }
+
     let refunded = false;
+    let refundAmount = null;
     if (booking.payment?.status === 'COMPLETED') {
-      if (booking.payment.stripePaymentIntentId) {
-        await stripe.refunds.create({ payment_intent: booking.payment.stripePaymentIntentId });
+      // Charging already in progress: only the unused portion of the
+      // upfront payment is refundable — the rest paid for energy already
+      // delivered. Not yet charging: nothing was consumed, refund it all.
+      const leftover =
+        wasCharging && booking.totalCost != null
+          ? round(Math.min(Math.max(booking.totalCost - usage.finalBill, 0), booking.payment.amount))
+          : booking.payment.amount;
+
+      if (leftover > 0) {
+        // Mock-mode payments carry a fake pi_mock_* id (still truthy) — only a
+        // real STRIPE-method payment has an id Stripe's API will recognize.
+        if (booking.payment.method === 'STRIPE' && booking.payment.stripePaymentIntentId) {
+          await stripe.refunds.create({
+            payment_intent: booking.payment.stripePaymentIntentId,
+            amount: toStripeAmount(leftover),
+          });
+        }
+        const fullyRefunded = leftover >= booking.payment.amount;
+        await prisma.payment.update({
+          where: { id: booking.payment.id },
+          data: {
+            status: fullyRefunded ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+            refundedAmount: leftover,
+          },
+        });
+        await prisma.chargingStation.update({
+          where: { id: booking.slot.stationId },
+          data: { totalRevenue: { decrement: leftover } },
+        });
+        refundAmount = leftover;
+        refunded = true;
       }
-      await prisma.payment.update({
-        where: { id: booking.payment.id },
-        data: { status: 'REFUNDED' },
-      });
-      await prisma.chargingStation.update({
-        where: { id: booking.slot.stationId },
-        data: { totalRevenue: { decrement: booking.payment.amount } },
-      });
-      refunded = true;
     }
 
     await prisma.booking.update({
       where: { id: req.params.id },
-      data: { status: 'CANCELLED', cancelReason: 'OWNER_CANCELLED' },
+      data: {
+        status: 'CANCELLED',
+        cancelReason: 'OWNER_CANCELLED',
+        ...(usage && { endTime, ...usage }),
+      },
     });
 
     await syncSlotStatus(booking.slotId);
@@ -600,7 +714,8 @@ export const ownerCancelBooking = async (req, res, next) => {
     const { subject, html } = emailTemplates.bookingOwnerCancelled(booking.user.name, {
       stationName: booking.slot.station.name,
       slotNumber: booking.slot.slotNumber,
-      refunded,
+      finalBill: usage?.finalBill ?? null,
+      refundAmount,
     });
     sendEmail({ to: booking.user.email, subject, html });
 
@@ -616,10 +731,10 @@ export const ownerCancelBooking = async (req, res, next) => {
     audit(
       req,
       'BOOKING_OWNER_CANCELLED',
-      `Cancelled booking ${booking.id} for ${booking.user.email}${refunded ? ' (refunded)' : ''}`
+      `Cancelled booking ${booking.id} for ${booking.user.email}${refundAmount ? ` (refunded ${refundAmount})` : ''}`
     );
 
-    res.json({ success: true, message: 'Booking cancelled', data: { refunded } });
+    res.json({ success: true, message: 'Booking cancelled', data: { refunded, refundAmount } });
   } catch (error) {
     next(error);
   }

@@ -12,6 +12,8 @@ import { authenticate } from '../middleware/auth.middleware.js';
 import { requireVerified } from '../middleware/kyc.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { createBookingRules } from '../validators/bookingValidators.js';
+import { emergencyStopSession } from '../controllers/chargingSession.controller.js';
+import { authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
@@ -24,5 +26,6 @@ router.patch('/:id/check-in', checkIn);
 router.post('/:id/payment-intent', createBookingPaymentIntent);
 router.patch('/:id/complete', completeBooking);
 router.patch('/:id/owner-cancel', ownerCancelBooking);
+router.patch('/:id/emergency-stop', authorize('STATION_OWNER'), emergencyStopSession);
 
 export default router;

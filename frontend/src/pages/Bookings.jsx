@@ -17,12 +17,13 @@ import { getSocket } from '../utils/socket';
 import { toast } from 'react-toastify';
 import PaymentModal from '../components/PaymentModal';
 import SEO from '../components/SEO';
+import Pagination from '../components/Pagination.jsx';
 
 const NO_SHOW_MINUTES = 15;
 
 export default function Bookings() {
   const dispatch = useDispatch();
-  const { bookings, loading, error } = useSelector((s) => s.bookings);
+  const { bookings, loading, error, pagination } = useSelector((s) => s.bookings);
   const { evs } = useSelector((s) => s.ev);
   const { user } = useSelector((s) => s.auth);
   const [filter, setFilter] = useState('');
@@ -204,16 +205,21 @@ export default function Bookings() {
           }
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="list-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {bookings.map((b, i) => {
             const noShowDeadline = new Date(
               new Date(b.startTime).getTime() + NO_SHOW_MINUTES * 60 * 1000
             );
             // Windowed bookings must check in within the 15-minute arrival
-            // window; auction wins have no scheduled window to be late for —
-            // they get a much longer grace period enforced server-side instead.
+            // window; auction wins instead carry their own reservationDeadline
+            // from the auction's configured Slot Reservation Time — miss it
+            // and the slot cascades to the next-ranked bidder server-side.
+            const reservationDeadline = b.reservationDeadline ? new Date(b.reservationDeadline) : null;
             const canCheckIn =
-              b.status === 'CONFIRMED' && (!b.plannedEndTime || new Date() < noShowDeadline);
+              b.status === 'CONFIRMED' &&
+              (b.plannedEndTime
+                ? new Date() < noShowDeadline
+                : !reservationDeadline || new Date() < reservationDeadline);
             return (
               <motion.div
                 key={b.id}
@@ -283,6 +289,11 @@ export default function Bookings() {
                     {canCheckIn && !b.plannedEndTime && (
                       <p style={{ color: 'var(--warning)', fontSize: '0.78rem', marginTop: 4 }}>
                         You won this auction — check in to claim your slot and pay.
+                        {reservationDeadline && (
+                          <>
+                            {' '}Confirm within <Countdown deadline={reservationDeadline} />
+                          </>
+                        )}
                       </p>
                     )}
                     {b.status === 'CHECKED_IN' && b.paymentDeadline && (
@@ -329,16 +340,8 @@ export default function Bookings() {
                     )}
                     {['PENDING', 'CONFIRMED', 'CHECKED_IN'].includes(b.status) && (
                       <button
+                        className="btn-cancel"
                         onClick={() => dispatch(cancelBooking(b.id))}
-                        style={{
-                          padding: '6px 14px',
-                          background: 'var(--danger-tint)',
-                          border: '1px solid var(--danger-tint-border)',
-                          borderRadius: 4,
-                          color: 'var(--danger)',
-                          cursor: 'pointer',
-                          fontSize: '0.82rem',
-                        }}
                       >
                         Cancel
                       </button>
@@ -358,6 +361,15 @@ export default function Bookings() {
           })}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={pagination?.pages}
+        onChange={setPage}
+        variant="standalone"
+        total={pagination?.total}
+        limit={10}
+      />
 
       {/* Check-in modal: confirm arrival, optionally swap EV */}
       <Modal show={!!checkInModal} onClose={() => setCheckInModal(null)} title="Confirm Check-In">

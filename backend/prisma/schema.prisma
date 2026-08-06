@@ -36,12 +36,13 @@ model User {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
-  evs      EV[]
-  bookings Booking[]
-  bids     Bid[]
-  reviews  Review[]
-  station  ChargingStation?
-  payments Payment[]
+  evs         EV[]
+  bookings    Booking[]
+  bids        Bid[]
+  reviews     Review[]
+  station     ChargingStation?
+  payments    Payment[]
+  auctionsWon Auction[]
 }
 
 enum Role {
@@ -93,9 +94,10 @@ model ChargingStation {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  slots   Slot[]
-  reviews Review[]
+  owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slots          Slot[]
+  reviews        Review[]
+  updateRequests StationUpdateRequest[]
 
   // status is filtered on literally every call to the public listing
   // (always WHERE status = APPROVED), and city is the most common
@@ -106,6 +108,36 @@ model ChargingStation {
   @@index([status, city])
 }
 
+// Once a station is APPROVED, its owner can no longer change address/city/
+// coordinates/price directly (see updateStation in station.controller.js) —
+// those fields go through here instead, and only take effect once an admin
+// approves the request. Name, amenities, and images stay directly editable;
+// they don't affect where a customer physically drives to or what they're
+// charged. A station may have at most one PENDING request at a time — a new
+// submission overwrites it rather than queuing a second one.
+model StationUpdateRequest {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  stationId   String        @unique @db.ObjectId
+  address     String?
+  city        String?
+  latitude    Float?
+  longitude   Float?
+  pricePerKwh Float?
+  status      RequestStatus @default(PENDING)
+  adminNote   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  reviewedAt  DateTime?
+
+  station ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum StationStatus {
   PENDING
   APPROVED
@@ -114,19 +146,25 @@ enum StationStatus {
 }
 
 model Slot {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
-  stationId   String     @db.ObjectId
-  slotNumber  Int
-  status      SlotStatus @default(AVAILABLE)
-  powerKw     Float
-  auctionOpen Boolean    @default(false)
-  auctionEnd  DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id                        String     @id @default(auto()) @map("_id") @db.ObjectId
+  stationId                 String     @db.ObjectId
+  slotNumber                Int
+  status                    SlotStatus @default(AVAILABLE)
+  powerKw                   Float
+  auctionOpen               Boolean    @default(false)
+  auctionEnd                DateTime?
+  // Set by the station owner when opening an auction (openAuction) — EV users
+  // never set these, they only place bids that must meet/exceed them.
+  auctionStartingBid        Float? // minimum a first bid must meet
+  auctionMinIncrement       Float? // optional; once there's a leading bid, a new bid must beat it by at least this much
+  auctionReservationMinutes Int? // how long a winning bidder has to check in before the slot cascades to the next-ranked bidder
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @updatedAt
 
   station  ChargingStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
   bookings Booking[]
   bids     Bid[]
+  auctions Auction[]
 
   // Backstops the check-then-insert in slot.controller.js's addSlot: without
   // this, two concurrent requests can both pass the pre-check and both
@@ -139,26 +177,49 @@ enum SlotStatus {
   OCCUPIED
   RESERVED
   MAINTENANCE
+  OFFLINE
+  FAULTED
 }
 
 model Booking {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
-  userId         String        @db.ObjectId
-  evId           String        @db.ObjectId
-  slotId         String        @db.ObjectId
-  status         BookingStatus @default(PENDING)
-  startTime      DateTime
-  plannedEndTime DateTime? // scheduled end of the reserved window; null = open-ended (auction wins / legacy)
-  endTime        DateTime? // actual end, set at completion; billing uses this, not the plan
-  totalCost      Float?
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String        @db.ObjectId
+  evId               String        @db.ObjectId
+  slotId             String        @db.ObjectId
+  status             BookingStatus @default(PENDING)
+  startTime          DateTime
+  plannedEndTime     DateTime? // scheduled end of the reserved window; null = open-ended (auction wins / legacy)
+  endTime            DateTime? // actual end, set at completion; billing uses this, not the plan
+  totalCost          Float?
+  finalEnergyKwh     Float? // server-calculated meter total captured when charging ends
+  durationMinutes    Int? // actual charging duration captured when charging ends
+  finalBill          Float? // final energy charge at the station rate when charging ends
+  stopReason         String? // required when an owner uses the emergency-stop workflow
+  ratePerKwh         Float? // rate snapshot used for the final session calculation
+  emergencyStoppedBy String?       @db.ObjectId // user id that triggered an emergency stop
+  emergencyStoppedAt DateTime? // exact time the emergency-stop action completed
 
   // ─── Check-in / pay-upfront flow ─────────────────────────────
-  checkInTime     DateTime? // set when the customer confirms arrival at the station
-  paymentDeadline DateTime? // checkInTime + grace period; auto-cancelled if unpaid past this
-  actualEvId      String?   @db.ObjectId // EV actually charged, if swapped at check-in (defaults to evId)
-  paymentIntentId String? // Stripe PaymentIntent for the locked-in upfront amount
-  overageAmount   Float? // extra owed if actual charging time exceeds the paid-for duration
-  cancelReason    String? // NO_SHOW | PAYMENT_TIMEOUT | OWNER_CANCELLED | USER_CANCELLED
+  checkInTime       DateTime? // set when the customer confirms arrival at the station
+  chargingStartedAt DateTime? // set server-side when payment activates the charger
+  paymentDeadline   DateTime? // checkInTime + grace period; auto-cancelled if unpaid past this
+  actualEvId        String?   @db.ObjectId // EV actually charged, if swapped at check-in (defaults to evId)
+  // Battery % snapshots for Usage Analytics. batteryBefore is captured from
+  // the charging EV at check-in; batteryAfter is derived when the session
+  // ends from energy delivered / EV.batteryCapacity (see utils/battery.js) —
+  // there's no real telemetry, so this is an estimate, not a meter reading.
+  // Null for any booking that never reached CHECKED_IN/COMPLETED.
+  batteryBefore     Float?
+  batteryAfter      Float?
+  paymentIntentId   String? // Stripe PaymentIntent for the locked-in upfront amount
+  overageAmount     Float? // extra owed if actual charging time exceeds the paid-for duration
+  cancelReason      String? // NO_SHOW | PAYMENT_TIMEOUT | OWNER_CANCELLED | USER_CANCELLED | AUCTION_RESERVATION_EXPIRED
+
+  // Auction-win reservation window: set only on bookings created by
+  // resolveAuctionForSlot/cascadeExpiredReservation. If the winner doesn't
+  // check in before this passes, the reservation cascades to the next-ranked
+  // bidder (see utils/auctionExpiry.js). Null for ordinary bookings.
+  reservationDeadline DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -202,31 +263,80 @@ enum BookingStatus {
   CANCELLED
 }
 
+// One row per auction ROUND on a slot — created when the owner opens an
+// auction, and kept forever as a durable history record (unlike Slot's own
+// auctionOpen/auctionStartingBid/etc fields, which just reflect the CURRENT
+// round and get overwritten the next time the owner opens a new auction on
+// the same slot). This is what backs the owner's Auctions page — the only
+// place "Completed"/"Cancelled" auction history with each round's own
+// starting bid/params can be reconstructed from.
+model Auction {
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  slotId             String        @db.ObjectId
+  startingBid        Float
+  minIncrement       Float?
+  reservationMinutes Int
+  auctionEnd         DateTime
+  status             AuctionStatus @default(ACTIVE)
+  winnerId           String?       @db.ObjectId
+  // PENDING_CONFIRMATION | CONFIRMED | EXPIRED | NO_WINNER — tracks the
+  // CURRENT winner's confirmation state as the reservation cascades through
+  // ranked bidders (see cascadeExpiredReservation in slot.controller.js).
+  winnerStatus       String?
+  closedAt           DateTime? // when bidding itself closed (set once, preserved across cascades)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  slot   Slot  @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  winner User? @relation(fields: [winnerId], references: [id])
+  bids   Bid[]
+
+  @@index([slotId, status])
+  @@index([slotId, createdAt])
+}
+
+enum AuctionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
 model Bid {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
   userId       String    @db.ObjectId
   slotId       String    @db.ObjectId
+  auctionId    String?   @db.ObjectId // which Auction round this bid belongs to (see Auction model)
   amount       Float
   batteryLevel Float
   priority     Float     @default(0)
   status       BidStatus @default(PENDING)
+  // Priority rank (1 = best) among eligible bids, assigned once the auction
+  // closes. Drives the winner-doesn't-confirm cascade: the next-lowest rank
+  // still PENDING is offered the reservation next. Null until the auction closes.
+  rank         Int?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slot    Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  auction Auction? @relation(fields: [auctionId], references: [id])
 
   // Backs the leaderboard/eligibility queries (slotId + status='PENDING',
   // ordered by priority) and placeBid's existing-bid lookup (userId + slotId
   // + status), both hit on every bid placement and every auction close.
   @@index([slotId, status])
   @@index([userId, slotId, status])
+  @@index([auctionId, priority])
 }
 
 enum BidStatus {
   PENDING
   WON
   LOST
+  // A bid that WON but whose reservation window lapsed without the bidder
+  // checking in — distinct from LOST (simply outranked) so the owner's
+  // Auctions page can show "Expired (No Response)" instead of "Not Selected".
+  EXPIRED
   CANCELLED
 }
 
@@ -238,6 +348,7 @@ model Payment {
   status                PaymentStatus @default(PENDING)
   method                String        @default("SIMULATION")
   stripePaymentIntentId String? // needed to issue a refund via the Stripe API
+  refundedAmount        Float? // sum refunded so far — e.g. the unused portion after an emergency stop
   createdAt             DateTime      @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -254,6 +365,7 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+  PARTIALLY_REFUNDED
 }
 
 model Log {

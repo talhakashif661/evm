@@ -13,7 +13,7 @@
  *
  * What it deliberately does NOT do:
  *   • Never overwrites an existing .env (your real credentials are safe).
- *   • Never invents values it can't know — DATABASE_URL, SENDGRID_API_KEY and
+ *   - Never invents values it cannot know: DATABASE_URL, SMTP credentials and
  *     the Stripe keys are left as the documented placeholders for you to fill.
  */
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
@@ -59,6 +59,6 @@ ensureEnv('frontend');
 console.log(
   '\nDone. Before running the backend, open backend/.env and fill in:\n' +
   '  • DATABASE_URL       (your MongoDB / Atlas connection string)\n' +
-  '  • SENDGRID_API_KEY   (optional — leave empty to disable email)\n' +
+  '  - SMTP_* + EMAIL_FROM (required for OTP/reset/notification emails)\n' +
   '  • STRIPE_* keys      (only if PAYMENT_MODE="live")\n'
 );

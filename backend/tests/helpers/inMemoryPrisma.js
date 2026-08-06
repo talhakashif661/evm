@@ -61,6 +61,7 @@ const MODELS = {
       bids: { model: 'bid', fk: 'userId', kind: 'hasMany' },
       payments: { model: 'payment', fk: 'userId', kind: 'hasMany' },
       station: { model: 'chargingStation', fk: 'ownerId', kind: 'hasOne' },
+      auctionsWon: { model: 'auction', fk: 'winnerId', kind: 'hasMany' },
     },
   },
   eV: {
@@ -77,15 +78,24 @@ const MODELS = {
     relations: {
       owner: { model: 'user', fk: 'ownerId', kind: 'belongsTo' },
       slots: { model: 'slot', fk: 'stationId', kind: 'hasMany' },
+      updateRequests: { model: 'stationUpdateRequest', fk: 'stationId', kind: 'hasMany' },
     },
   },
   slot: {
     uniques: ['id'],
-    defaults: () => ({ status: 'AVAILABLE', auctionOpen: false, auctionEnd: null }),
+    defaults: () => ({
+      status: 'AVAILABLE',
+      auctionOpen: false,
+      auctionEnd: null,
+      auctionStartingBid: null,
+      auctionMinIncrement: null,
+      auctionReservationMinutes: null,
+    }),
     relations: {
       station: { model: 'chargingStation', fk: 'stationId', kind: 'belongsTo' },
       bookings: { model: 'booking', fk: 'slotId', kind: 'hasMany' },
       bids: { model: 'bid', fk: 'slotId', kind: 'hasMany' },
+      auctions: { model: 'auction', fk: 'slotId', kind: 'hasMany' },
     },
   },
   booking: {
@@ -112,10 +122,26 @@ const MODELS = {
   },
   bid: {
     uniques: ['id'],
-    defaults: () => ({ priority: 0, status: 'PENDING' }),
+    defaults: () => ({ priority: 0, status: 'PENDING', rank: null, auctionId: null }),
     relations: {
       user: { model: 'user', fk: 'userId', kind: 'belongsTo' },
       slot: { model: 'slot', fk: 'slotId', kind: 'belongsTo' },
+      auction: { model: 'auction', fk: 'auctionId', kind: 'belongsTo' },
+    },
+  },
+  auction: {
+    uniques: ['id'],
+    defaults: () => ({
+      status: 'ACTIVE',
+      minIncrement: null,
+      winnerId: null,
+      winnerStatus: null,
+      closedAt: null,
+    }),
+    relations: {
+      slot: { model: 'slot', fk: 'slotId', kind: 'belongsTo' },
+      winner: { model: 'user', fk: 'winnerId', kind: 'belongsTo' },
+      bids: { model: 'bid', fk: 'auctionId', kind: 'hasMany' },
     },
   },
   payment: {
@@ -141,6 +167,13 @@ const MODELS = {
     defaults: () => ({ comment: null }),
     relations: {
       user: { model: 'user', fk: 'userId', kind: 'belongsTo' },
+      station: { model: 'chargingStation', fk: 'stationId', kind: 'belongsTo' },
+    },
+  },
+  stationUpdateRequest: {
+    uniques: ['id', 'stationId'],
+    defaults: () => ({ status: 'PENDING', adminNote: null, reviewedAt: null }),
+    relations: {
       station: { model: 'chargingStation', fk: 'stationId', kind: 'belongsTo' },
     },
   },
@@ -395,6 +428,20 @@ export function createInMemoryPrisma() {
       const rows = store[model].filter((r) => matches(model, r, where));
       rows.forEach((r) => applyData(r, data));
       return { count: rows.length };
+    },
+    // `where` here is a unique-field lookup (Prisma's upsert contract), same
+    // shape findUnique/update accept — not a general filter.
+    upsert: async ({ where, create, update: updateData, ...args } = {}) => {
+      const rec = store[model].find((r) => Object.entries(where).every(([k, v]) => eq(r[k], v)));
+      if (rec) {
+        applyData(rec, updateData);
+        return shape(model, rec, args);
+      }
+      enforceUniques(model, create);
+      const now = new Date();
+      const newRec = { id: objectId(), createdAt: now, updatedAt: now, ...MODELS[model].defaults(), ...create };
+      store[model].push(newRec);
+      return shape(model, newRec, args);
     },
     delete: async ({ where } = {}) => {
       const idx = store[model].findIndex((r) =>

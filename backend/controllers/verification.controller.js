@@ -16,6 +16,14 @@ export const sendOTP = async (req, res, next) => {
         secondsLeft: result.secondsLeft,
       });
     }
+    if (!result.emailSent) {
+      return res.status(503).json({
+        success: false,
+        message:
+          'We could not deliver the verification email. Please try again shortly or contact support.',
+        error: 'EMAIL_DELIVERY_FAILED',
+      });
+    }
 
     res.json({
       success: true,
@@ -99,6 +107,14 @@ export const resendOTP = async (req, res, next) => {
         message: `Please wait ${result.secondsLeft}s before requesting another code.`,
         error: 'RESEND_COOLDOWN',
         secondsLeft: result.secondsLeft,
+      });
+    }
+    if (!result.emailSent) {
+      return res.status(503).json({
+        success: false,
+        message:
+          'We could not deliver the verification email. Please try again shortly or contact support.',
+        error: 'EMAIL_DELIVERY_FAILED',
       });
     }
 

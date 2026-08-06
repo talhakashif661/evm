@@ -76,12 +76,24 @@ export const sendVerificationOTP = async (userId) => {
   const result = await sendEmail({ to: user.email, subject, html });
 
   if (!result.success) {
-    logger.error(`Failed to deliver OTP email to ${user.email}`);
+    // Do not leave an undelivered code looking like a successfully sent one.
+    // Clearing the timestamp also lets the user retry immediately after the
+    // mail configuration/provider issue has been corrected.
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationOtpHash: null,
+        verificationOtpExpiry: null,
+        lastOtpSentAt: null,
+      },
+    });
+    logger.error(`Failed to deliver OTP email to ${user.email}: ${result.error}`);
+    return { alreadyVerified: false, cooldown: false, emailSent: false };
   } else {
     logger.info(`Verification OTP sent to ${user.email}`);
   }
 
-  return { alreadyVerified: false, cooldown: false, emailSent: result.success };
+  return { alreadyVerified: false, cooldown: false, emailSent: true };
 };
 
 /**

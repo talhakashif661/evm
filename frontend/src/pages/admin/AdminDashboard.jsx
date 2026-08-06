@@ -55,7 +55,7 @@ export default function AdminDashboard() {
           ))}
         </div>
         <div className="row g-4">
-          <div className="col-12 col-lg-7">
+          <div className="col-12 col-lg-8">
             <div className="ev-card" style={{ padding: 24, height: '100%' }}>
               <Skeleton height={220} radius={8} />
             </div>
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
     <div className="page-container">
       <SEO
         title="Admin Dashboard"
-        description="Manage stations, users, and monitor EV charging activity across the ChargeEV platform."
+        description="Manage stations, users, and monitor EV charging activity across the Unified EV platform."
         noIndex
       />
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -140,27 +140,47 @@ export default function AdminDashboard() {
                   fontSize: '1.1rem',
                   fontWeight: 700,
                   marginBottom: 20,
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  color: 'var(--text-primary)',
                 }}
               >
-                Bookings — Last 6 Months
+                Booking activity
               </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '-12px 0 20px' }}>
+                Monthly bookings over the last six months
+              </p>
               {chartData && chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} />
-                    <YAxis stroke="var(--text-muted)" fontSize={12} allowDecimals={false} />
+                <ResponsiveContainer width="100%" height={340}>
+                  <BarChart data={chartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--border)" />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+                      dy={10}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+                      allowDecimals={false}
+                    />
                     <Tooltip
+                      cursor={{ fill: 'var(--primary-glow)', opacity: 0.55 }}
+                      formatter={(value) => [value, 'Bookings']}
                       contentStyle={{
                         background: 'var(--bg-card)',
                         border: '1px solid var(--border)',
-                        borderRadius: 8,
+                        borderRadius: 10,
+                        boxShadow: 'var(--shadow-sm)',
                       }}
                     />
-                    <Bar dataKey="bookings" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+                    <Bar
+                      dataKey="bookings"
+                      fill="var(--primary)"
+                      radius={[7, 7, 2, 2]}
+                      maxBarSize={52}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -171,7 +191,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="col-12 col-lg-5">
+          <div className="col-12 col-lg-4">
             <div className="ev-card" style={{ padding: 24, height: '100%' }}>
               <h2
                 style={{

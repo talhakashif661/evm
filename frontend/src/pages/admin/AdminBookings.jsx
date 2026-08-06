@@ -6,7 +6,9 @@ import {
   cancelAdminBooking,
 } from '../../store/slices/adminBookingsSlice';
 import { toPKR } from '../../utils/pkr';
-import { SkeletonRow } from '../../components/Skeleton';
+import { SkeletonTableRows } from '../../components/Skeleton';
+import { EmptyState } from '../../components/Spinner';
+import Pagination from '../../components/Pagination.jsx';
 import SEO from '../../components/SEO';
 
 const statusBadge = (s) =>
@@ -14,7 +16,7 @@ const statusBadge = (s) =>
     COMPLETED: 'badge-success',
     CONFIRMED: 'badge-primary',
     ACTIVE: 'badge-warning',
-    CANCELLED: 'badge-danger',
+    CANCELLED: 'badge-cancelled',
     PENDING: 'badge-info',
   })[s] || 'badge-info';
 // Mirrors ownerCancelBooking's own allowed-status gate (booking.controller.js).
@@ -26,7 +28,7 @@ export default function AdminBookings() {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    dispatch(fetchBookings({ page, limit: 20 }));
+    dispatch(fetchBookings({ page, limit: 10 }));
   }, [dispatch, page]);
 
   const handleCancel = (id) => {
@@ -43,7 +45,7 @@ export default function AdminBookings() {
     <div className="page-container">
       <SEO
         title="Manage Bookings"
-        description="View and monitor all EV charging bookings across the ChargeEV platform."
+        description="View and monitor all EV charging bookings across the Unified EV platform."
         noIndex
       />
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -60,32 +62,33 @@ export default function AdminBookings() {
           </h1>
         </div>
 
-        {loading ? (
-          <div className="ev-card" style={{ padding: '8px 20px' }}>
-            {[...Array(6)].map((_, i) => (
-              <SkeletonRow key={i} />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="ev-card" style={{ overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="ev-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>User</th>
-                      <th>Station</th>
-                      <th>Slot</th>
-                      <th>Start</th>
-                      <th>Cost</th>
-                      <th>Payment</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(bookings || []).map((b, i) => (
+        <div className="ev-card" style={{ overflow: 'hidden' }}>
+          <div className="table-scroll">
+            <table className="ev-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>User</th>
+                  <th>Station</th>
+                  <th>Slot</th>
+                  <th>Start</th>
+                  <th>Cost</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <SkeletonTableRows rows={6} columns={9} />
+                ) : !bookings || bookings.length === 0 ? (
+                  <tr>
+                    <td colSpan={9}>
+                      <EmptyState title="No Records Found" subtitle="No bookings to show yet." />
+                    </td>
+                  </tr>
+                ) : (
+                  bookings.map((b, i) => (
                       <tr key={b.id}>
                         <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>
                         <td>
@@ -124,49 +127,27 @@ export default function AdminBookings() {
                         </td>
                         <td>
                           {CANCELLABLE.includes(b.status) && (
-                            <button className="btn-danger-sm" onClick={() => handleCancel(b.id)}>
+                            <button className="btn-danger-sm btn-cancel" onClick={() => handleCancel(b.id)}>
                               Cancel
                             </button>
                           )}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            {pagination && pagination.pages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-                <button
-                  className="btn-outline"
-                  style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Previous
-                </button>
-                <span
-                  style={{
-                    alignSelf: 'center',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  Page {pagination.page} of {pagination.pages}
-                </span>
-                <button
-                  className="btn-outline"
-                  style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                  disabled={page >= pagination.pages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
+        <Pagination
+          page={page}
+          totalPages={pagination?.pages}
+          onChange={setPage}
+          variant="standalone"
+          total={pagination?.total}
+          limit={10}
+        />
       </motion.div>
     </div>
   );

@@ -22,14 +22,27 @@ import request from 'supertest';
 process.env.JWT_SECRET = 'otp-test-secret';
 process.env.JWT_EXPIRES_IN = '1h';
 process.env.NODE_ENV = 'test';
-// Unset so sendEmail() takes its no-key short-circuit instead of calling
-// SendGrid over the network mid-test.
-delete process.env.SENDGRID_API_KEY;
+// Never call SMTP over the network in this suite.
+delete process.env.SMTP_HOST;
+delete process.env.SMTP_PORT;
+delete process.env.SMTP_USER;
+delete process.env.SMTP_PASS;
+delete process.env.EMAIL_FROM;
 
 const { createInMemoryPrisma } = await import('./helpers/inMemoryPrisma.js');
 const mockPrisma = createInMemoryPrisma();
+const sendEmailMock = jest.fn().mockResolvedValue({
+  success: true,
+  messageId: 'test-message-id',
+});
 
 jest.unstable_mockModule('../utils/prisma.js', () => ({ default: mockPrisma }));
+jest.unstable_mockModule('../utils/email.js', () => ({
+  sendEmail: sendEmailMock,
+  emailTemplates: {
+    welcome: () => ({ subject: 'Welcome', html: '<p>Welcome</p>' }),
+  },
+}));
 
 const { default: app } = await import('../app.js');
 
@@ -90,6 +103,19 @@ describe('POST /api/auth/send-otp', () => {
     // A 6-digit code would be 6 chars; a 64-char hex digest proves it was
     // hashed on the way in rather than parked in the column as-is.
     expect(user.verificationOtpHash).not.toMatch(/^\d{6}$/);
+  });
+
+  it('reports delivery failure and clears the unusable code and cooldown', async () => {
+    sendEmailMock.mockResolvedValueOnce({ success: false, error: 'Sender is not verified' });
+
+    const res = await api().post('/api/auth/send-otp').set(auth(token)).send({});
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe('EMAIL_DELIVERY_FAILED');
+    const user = await row();
+    expect(user.verificationOtpHash).toBeNull();
+    expect(user.verificationOtpExpiry).toBeNull();
+    expect(user.lastOtpSentAt).toBeNull();
   });
 
   it('rejects an immediate second request with a cooldown', async () => {

@@ -34,86 +34,11 @@ const trustStats = [
   { value: '4.8★', label: 'Average Rating' },
 ];
 
-// Hand-drawn, license-free SVG illustration (no external images/fonts needed)
-// so the hero never depends on network access to a third-party asset host.
-// Colors are drawn only from the cream/gold/dark palette (--bg-*, --text-primary,
-// --accent-gold*) — no blue/green accents, to stay strictly on-brand.
-function ChargingIllustration() {
-  return (
-    <svg
-      viewBox="0 0 420 340"
-      width="100%"
-      role="img"
-      aria-label="Illustration of an electric car charging at a station"
-    >
-      <ellipse cx="210" cy="300" rx="170" ry="18" fill="var(--bg-secondary)" />
-
-      {/* Charging station */}
-      <rect
-        x="300"
-        y="120"
-        width="46"
-        height="150"
-        rx="10"
-        fill="var(--bg-card)"
-        stroke="var(--accent-gold)"
-        strokeWidth="2"
-      />
-      <rect x="310" y="140" width="26" height="40" rx="4" fill="var(--bg-secondary)" />
-      <circle cx="323" cy="160" r="9" fill="var(--text-primary)" />
-      <path
-        d="M320 154 L326 154 L322 160 L327 160 L318 170 L320 162 L316 162 Z"
-        fill="var(--bg-card)"
-      />
-      <path
-        d="M323 270 C 300 270, 290 250, 290 230"
-        stroke="var(--text-primary)"
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* Car body — near-black, the one solid brand color */}
-      <g>
-        <path
-          d="M40 240 Q40 190 100 185 L140 160 Q160 150 200 150 L240 150 Q260 150 275 165 L292 190 L292 240 Z"
-          fill="var(--text-primary)"
-          opacity="0.92"
-        />
-        <path d="M150 165 L185 165 L205 190 L145 190 Z" fill="var(--bg-primary)" opacity="0.9" />
-        <rect x="40" y="230" width="252" height="30" rx="12" fill="var(--text-primary)" />
-        <circle cx="95" cy="262" r="20" fill="var(--text-primary)" />
-        <circle cx="95" cy="262" r="8" fill="var(--bg-card)" />
-        <circle cx="245" cy="262" r="20" fill="var(--text-primary)" />
-        <circle cx="245" cy="262" r="8" fill="var(--bg-card)" />
-        <rect x="80" y="205" width="16" height="6" rx="2" fill="var(--bg-card)" opacity="0.9" />
-      </g>
-
-      {/* Charging cable — gold, used sparingly as the one accent */}
-      <path
-        d="M292 205 C 280 215, 270 220, 300 230"
-        stroke="var(--accent-gold)"
-        strokeWidth="4"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* Minimal decorative accents — gold only, per the palette */}
-      <path
-        d="M60 130 Q75 105 100 115 Q90 140 60 130Z"
-        fill="var(--accent-gold-light)"
-        opacity="0.55"
-      />
-      <path d="M340 60 Q355 40 375 50 Q365 72 340 60Z" fill="var(--accent-gold)" opacity="0.35" />
-    </svg>
-  );
-}
-
 export default function Landing() {
   const shouldReduceMotion = useReducedMotion();
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="landing-page" style={{ minHeight: '100vh' }}>
       <SEO
         title="Find EV Charging Stations Near You"
         description="Discover and book EV charging stations near you. Real-time availability, transparent PKR pricing, AI-powered recommendations, and live slot auctions."
@@ -126,11 +51,11 @@ export default function Landing() {
         data={{
           '@context': 'https://schema.org',
           '@type': 'Organization',
-          name: 'ChargeEV',
+          name: 'Unified EV',
           url: typeof window !== 'undefined' ? window.location.origin : '',
           logo: typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '',
           description:
-            'ChargeEV is an EV charging station booking platform offering real-time slot booking, AI-powered station recommendations, and priority slot auctions.',
+            'Unified EV is an EV charging station management platform offering real-time slot booking, AI-powered station recommendations, and priority slot auctions.',
           contactPoint: {
             '@type': 'ContactPoint',
             telephone: CONTACT.phone,
@@ -163,6 +88,7 @@ export default function Landing() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.05 }}
+              className="hero-kicker"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -186,6 +112,7 @@ export default function Landing() {
             </motion.div>
 
             <motion.h1
+              className="hero-heading"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
@@ -198,12 +125,13 @@ export default function Landing() {
                 marginBottom: 20,
               }}
             >
-              Smart EV Charging,
+              Unified EV
               <br />
-              <span style={{ color: 'var(--accent-gold-dark)' }}>Simplified</span>
+              <span style={{ color: 'var(--accent-gold-dark)' }}>Management System</span>
             </motion.h1>
 
             <motion.p
+              className="hero-lead"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.18 }}
@@ -305,7 +233,13 @@ export default function Landing() {
             transition={{ duration: 0.6, delay: 0.15 }}
             style={{ flex: '1 1 320px', minWidth: 260, maxWidth: 440 }}
           >
-            <ChargingIllustration />
+            <img
+              src="/ev-hero-car.png"
+              alt="Electric vehicle charging at a Unified EV station"
+              width="420"
+              height="340"
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+            />
           </motion.div>
         </div>
 
@@ -369,7 +303,7 @@ export default function Landing() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.08 }}
-                className="ev-card"
+                className="ev-card landing-feature-card"
                 style={{ padding: 32 }}
               >
                 <div
@@ -406,6 +340,7 @@ export default function Landing() {
 
       {/* CTA */}
       <section
+        className="landing-cta-section"
         style={{
           padding: '32px 32px 120px',
           textAlign: 'center',
@@ -414,6 +349,7 @@ export default function Landing() {
         }}
       >
         <motion.div
+          className="landing-cta-card"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}

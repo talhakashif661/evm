@@ -1,37 +1,49 @@
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 import logger from './logger.js';
 
-// Render's free tier blocks outbound SMTP (ports 25/465/587), which is why
-// this goes through SendGrid's HTTPS API instead of nodemailer/SMTP. Setting
-// the key is optional at import time — a fresh clone (or a deploy made
-// before the key is added) shouldn't crash the app, only skip sending, same
-// as the old transporter's fire-and-forget failure behavior.
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+const createTransporter = () =>
+  nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || '').toLowerCase() === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
 
-export const sendEmail = async ({ to, subject, html }) => {
-  if (!process.env.SENDGRID_API_KEY) {
-    logger.warn(`SENDGRID_API_KEY not set — skipping email to ${to} ("${subject}")`);
-    return { success: false, error: 'SENDGRID_API_KEY not configured' };
+const missingSmtpConfig = () =>
+  ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM'].filter((key) => !process.env[key]);
+
+const sendWithSmtp = async ({ to, subject, html }) => {
+  const missing = missingSmtpConfig();
+  if (missing.length > 0) {
+    logger.warn(`SMTP email is not configured. Skipping email to ${to} ("${subject}")`);
+    const detail = `SMTP email is not configured; missing ${missing.join(', ')}`;
+    return { success: false, error: detail };
   }
 
+  const info = await createTransporter().sendMail({
+    to,
+    from: process.env.EMAIL_FROM,
+    subject,
+    html,
+  });
+
+  return { success: true, messageId: info.messageId };
+};
+
+export const sendEmail = async ({ to, subject, html }) => {
   try {
-    const [response] = await sgMail.send({
-      to,
-      from: process.env.EMAIL_FROM,
-      subject,
-      html,
-    });
-    const messageId = response.headers['x-message-id'];
-    logger.info(`Email sent to ${to}: ${messageId}`);
-    return { success: true, messageId };
+    const result = await sendWithSmtp({ to, subject, html });
+
+    if (result.success) {
+      logger.info(`Email sent to ${to}: ${result.messageId}`);
+    }
+    return result;
   } catch (error) {
     // Never throw from here - email failures should never crash a request.
     // The caller treats this as fire-and-forget; we just log and move on.
-    // SendGrid puts the real reason in error.response.body, not error.message
-    // (which is just "Bad Request" / "Forbidden" etc) — e.g. an unverified
-    // EMAIL_FROM sender identity surfaces here as a 403 with a clear detail.
     const detail = error.response?.body?.errors?.map((e) => e.message).join('; ') || error.message;
     logger.error(`Failed to send email to ${to}:`, detail);
     return { success: false, error: detail };
@@ -122,6 +134,40 @@ export const emailTemplates = {
     `,
   }),
 
+  stationUpdateApproved: (ownerName, stationName) => ({
+    subject: '✅ Station Change Approved - ChargeEV',
+    html: html`
+      <div
+        style="font-family:Arial,sans-serif;background:#FDF8F0;color:#4A4A4A;padding:40px;border-radius:12px"
+      >
+        <h1 style="color:#1A1A1A">Change Approved</h1>
+        <p>
+          Hi ${ownerName}, your requested address/price change for "${stationName}" has been
+          approved and is now live.
+        </p>
+        <p style="color:#8A8A8A">The ChargeEV Team</p>
+      </div>
+    `,
+  }),
+
+  stationUpdateRejected: (ownerName, stationName, adminNote) => ({
+    subject: 'Station Change Request Update - ChargeEV',
+    html: html`
+      <div
+        style="font-family:Arial,sans-serif;background:#FDF8F0;color:#4A4A4A;padding:40px;border-radius:12px"
+      >
+        <h1 style="color:#B33A3A">Change Not Approved</h1>
+        <p>
+          Hi ${ownerName}, your requested address/price change for "${stationName}" was not
+          approved.
+        </p>
+        ${adminNote ? raw(html`<p><strong>Admin note:</strong> ${adminNote}</p>`) : ''}
+        <p>Your station's current address and price are unchanged. You can submit a new request any time.</p>
+        <p style="color:#8A8A8A">The ChargeEV Team</p>
+      </div>
+    `,
+  }),
+
   passwordReset: (name, resetUrl) => ({
     subject: '🔑 Reset Your Password - ChargeEV',
     html: html`
@@ -202,6 +248,29 @@ export const emailTemplates = {
     `,
   }),
 
+  ownerBookingExpired: (name, slotInfo) => ({
+    subject: 'Booking Expired - Slot Updated',
+    html: html`
+      <div
+        style="font-family:Arial,sans-serif;background:#FDF8F0;color:#4A4A4A;padding:40px;border-radius:12px"
+      >
+        <h1 style="color:#B33A3A">Booking Expired</h1>
+        <p>
+          Hi ${name}, ${slotInfo.customerName}'s booking for Slot #${slotInfo.slotNumber} at
+          <strong>${slotInfo.stationName}</strong> expired because they did not check in on time.
+        </p>
+        <p>
+          ${
+            slotInfo.slotReleased
+              ? 'The slot is available for other customers now.'
+              : 'The slot kept its offline, faulted, or maintenance status and was not made available.'
+          }
+        </p>
+        <p style="color:#8A8A8A">The ChargeEV Team</p>
+      </div>
+    `,
+  }),
+
   auctionWinExpired: (name, slotInfo) => ({
     subject: '⏱️ Auction Win Expired - Not Claimed',
     html: html`
@@ -238,6 +307,29 @@ export const emailTemplates = {
     `,
   }),
 
+  chargingEmergencyStopped: (name, info) => ({
+    subject: '🛑 Charging Session Stopped Early',
+    html: html`
+      <div
+        style="font-family:Arial,sans-serif;background:#FDF8F0;color:#4A4A4A;padding:40px;border-radius:12px"
+      >
+        <h1 style="color:#B33A3A">Charging Session Stopped</h1>
+        <p>
+          Hi ${name}, the station stopped your charging session at
+          <strong>${info.stationName}</strong> (Slot #${info.slotNumber}) before it finished.
+        </p>
+        <p><strong>Reason given:</strong> ${info.reason}</p>
+        <p><strong>Amount billed for actual usage:</strong> Rs. ${info.finalBill}</p>
+        ${info.refundAmount
+          ? raw(
+              `<p><strong>Rs. ${info.refundAmount} of your original payment has been refunded</strong> to your original payment method and should appear within a few business days.</p>`
+            )
+          : ''}
+        <p style="color:#8A8A8A">The ChargeEV Team</p>
+      </div>
+    `,
+  }),
+
   bookingOwnerCancelled: (name, slotInfo) => ({
     subject: '❌ Booking Cancelled by Station',
     html: html`
@@ -249,7 +341,14 @@ export const emailTemplates = {
           Hi ${name}, your booking at <strong>${slotInfo.stationName}</strong> (Slot
           #${slotInfo.slotNumber}) was cancelled by the station.
         </p>
-        ${slotInfo.refunded ? raw('<p><strong>Your payment has been refunded.</strong></p>') : ''}
+        ${slotInfo.finalBill != null
+          ? raw(`<p><strong>Amount billed for actual usage:</strong> Rs. ${slotInfo.finalBill}</p>`)
+          : ''}
+        ${slotInfo.refundAmount
+          ? raw(
+              `<p><strong>Rs. ${slotInfo.refundAmount} of your payment has been refunded</strong> to your original payment method and should appear within a few business days.</p>`
+            )
+          : ''}
         <p style="color:#8A8A8A">The ChargeEV Team</p>
       </div>
     `,

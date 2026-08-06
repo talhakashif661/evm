@@ -8,8 +8,8 @@ import { useLocation } from 'react-router-dom';
  * change (or fixing a mistake) happens once, not across 24 files.
  *
  * `title` should be the PAGE-SPECIFIC part only (e.g. "My EV Charging
- * Bookings") — this component adds the "ChargeEV - ... | EV Charging Made
- * Simple" wrapper, so don't repeat "ChargeEV" in the prop or it'll appear twice.
+ * Bookings") — this component adds the "Unified EV - ... | EV Management
+ * System" wrapper, so don't repeat "Unified EV" in the prop or it'll appear twice.
  *
  * og:url / og:image / canonical are computed from the real current origin
  * (window.location.origin) rather than a hardcoded domain — this app hasn't
@@ -30,7 +30,7 @@ export default function SEO({ title, description, noIndex = false, image }) {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const url = `${origin}${location.pathname}`;
   const ogImage = image || `${origin}/og-image.png`;
-  const fullTitle = `ChargeEV - ${title} | EV Charging Made Simple`;
+  const fullTitle = `Unified EV - ${title} | EV Management System`;
 
   return (
     <Helmet>
@@ -39,7 +39,7 @@ export default function SEO({ title, description, noIndex = false, image }) {
       <meta name="description" content={description} />
 
       {/* Open Graph */}
-      <meta property="og:title" content={`ChargeEV - ${title}`} />
+      <meta property="og:title" content={`Unified EV - ${title}`} />
       <meta property="og:description" content={description} />
       <meta property="og:type" content="website" />
       <meta property="og:url" content={url} />
@@ -47,7 +47,7 @@ export default function SEO({ title, description, noIndex = false, image }) {
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={`ChargeEV - ${title}`} />
+      <meta name="twitter:title" content={`Unified EV - ${title}`} />
       <meta name="twitter:description" content={description} />
 
       {/* Additional */}

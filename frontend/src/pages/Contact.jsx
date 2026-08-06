@@ -39,7 +39,7 @@ export default function Contact() {
     >
       <SEO
         title="Contact Us"
-        description="Get in touch with the ChargeEV team for support, questions, partnership inquiries, or feedback. We're here to help."
+        description="Get in touch with the Unified EV team for support, questions, partnership inquiries, or feedback. We're here to help."
       />
       <div style={{ textAlign: 'center', marginBottom: 36 }}>
         <h1 className="section-title" style={{ justifyContent: 'center' }}>
@@ -183,7 +183,7 @@ export default function Contact() {
               Reach us directly
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 24 }}>
-              Prefer talking to a human? {CONTACT.name} built and maintains ChargeEV.
+              Prefer talking to a human? {CONTACT.name} built and maintains Unified EV.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -227,7 +227,7 @@ export default function Contact() {
               </a>
 
               <a
-                href={waLink(CONTACT.phone, 'Hi! I have a question about ChargeEV.')}
+                href={waLink(CONTACT.phone, 'Hi! I have a question about Unified EV.')}
                 target="_blank"
                 rel="noreferrer"
                 style={{

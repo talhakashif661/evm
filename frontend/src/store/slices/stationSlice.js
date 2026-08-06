@@ -20,9 +20,11 @@ export const fetchStations = createAsyncThunk(
     // genuinely different search/filter/page always goes through, this
     // only catches redundant re-fetches of what's already on screen.
     condition: (params = {}, { getState }) => {
-      const { lastFetchedAt, lastQueryKey } = getState().stations;
+      const { loading, activeQueryKey, lastFetchedAt, lastQueryKey } = getState().stations;
       const queryKey = JSON.stringify(params);
-      return !(queryKey === lastQueryKey && isFresh(lastFetchedAt));
+      const sameRequestInFlight = loading && queryKey === activeQueryKey;
+      const sameRequestIsFresh = queryKey === lastQueryKey && isFresh(lastFetchedAt);
+      return !sameRequestInFlight && !sameRequestIsFresh;
     },
   }
 );
@@ -46,8 +48,18 @@ export const fetchMyStation = createAsyncThunk(
       const res = await api.get('/stations/owner/mine');
       return res.data;
     } catch (err) {
+      // A station owner who has not registered a station yet is a valid empty
+      // state, not an error that should interrupt them with a toast.
+      if (err.response?.status === 404) {
+        return { success: true, data: null };
+      }
       return rejectWithValue(err.response?.data?.message);
     }
+  },
+  {
+    // React StrictMode intentionally mounts effects twice in development.
+    // Keep the second mount from issuing the same owner lookup concurrently.
+    condition: (_, { getState }) => !getState().stations.myStationRequestPending,
   }
 );
 
@@ -86,9 +98,17 @@ export const addSlot = createAsyncThunk('stations/addSlot', async (data, { rejec
 
 export const openSlotAuction = createAsyncThunk(
   'stations/openAuction',
-  async ({ slotId, durationMinutes }, { rejectWithValue }) => {
+  async (
+    { slotId, durationMinutes, startingBid, minIncrement, reservationMinutes },
+    { rejectWithValue }
+  ) => {
     try {
-      const res = await api.post(`/slots/${slotId}/auction/open`, { durationMinutes });
+      const res = await api.post(`/slots/${slotId}/auction/open`, {
+        durationMinutes,
+        startingBid,
+        minIncrement,
+        reservationMinutes,
+      });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message);
@@ -117,9 +137,11 @@ const stationSlice = createSlice({
     slots: [],
     pagination: null,
     loading: false,
+    myStationRequestPending: false,
     error: null,
     lastFetchedAt: null,
     lastQueryKey: null,
+    activeQueryKey: null,
   },
   reducers: {
     clearCurrentStation: (state) => {
@@ -128,8 +150,10 @@ const stationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchStations.pending, (state) => {
+      .addCase(fetchStations.pending, (state, action) => {
         state.loading = true;
+        state.error = null;
+        state.activeQueryKey = JSON.stringify(action.meta.arg || {});
       })
       .addCase(fetchStations.fulfilled, (state, action) => {
         state.loading = false;
@@ -137,25 +161,37 @@ const stationSlice = createSlice({
         state.pagination = action.payload.pagination;
         state.lastFetchedAt = Date.now();
         state.lastQueryKey = action.payload.queryKey;
+        state.activeQueryKey = null;
+        state.error = null;
       })
       .addCase(fetchStations.rejected, (state, action) => {
         state.loading = false;
+        state.activeQueryKey = null;
         state.error = action.payload;
-        toast.error(action.payload || 'Failed to load stations');
+        toast.error(action.payload || 'Failed to load stations', {
+          toastId: 'stations-fetch-error',
+        });
       })
       .addCase(fetchStationById.fulfilled, (state, action) => {
         state.currentStation = action.payload.data;
       })
       .addCase(fetchMyStation.pending, (state) => {
         state.loading = true;
+        state.myStationRequestPending = true;
       })
       .addCase(fetchMyStation.fulfilled, (state, action) => {
         state.loading = false;
+        state.myStationRequestPending = false;
         state.myStation = action.payload.data;
+        state.error = null;
       })
       .addCase(fetchMyStation.rejected, (state, action) => {
         state.loading = false;
-        toast.error(action.payload || 'Failed to load your station');
+        state.myStationRequestPending = false;
+        state.error = action.payload;
+        toast.error(action.payload || 'Failed to load your station', {
+          toastId: 'my-station-fetch-error',
+        });
       })
       .addCase(createStation.fulfilled, (state, action) => {
         state.myStation = action.payload.data;
@@ -175,8 +211,14 @@ const stationSlice = createSlice({
         if (idx !== -1) state.slots[idx] = action.payload.data;
         toast.success('Auction opened!');
       })
+      .addCase(openSlotAuction.rejected, (_, action) => {
+        toast.error(action.payload || 'Failed to open auction');
+      })
       .addCase(closeSlotAuction.fulfilled, (_, action) => {
         toast.success(action.payload.message || 'Auction closed');
+      })
+      .addCase(closeSlotAuction.rejected, (_, action) => {
+        toast.error(action.payload || 'Failed to close auction');
       });
   },
 });

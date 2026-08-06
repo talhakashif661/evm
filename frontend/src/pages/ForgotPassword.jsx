@@ -36,7 +36,7 @@ export default function ForgotPassword() {
     >
       <SEO
         title="Forgot Password"
-        description="Reset your ChargeEV account password securely via email."
+        description="Reset your Unified EV account password securely via email."
         noIndex
       />
       <motion.div

@@ -117,7 +117,7 @@ export default function VerifyEmail() {
     <div style={{ maxWidth: 420, margin: '64px auto', padding: '0 16px' }}>
       <SEO
         title="Verify Your Email"
-        description="Verify your email address to unlock all ChargeEV features."
+        description="Verify your email address to unlock all Unified EV features."
         noIndex
       />
       <div

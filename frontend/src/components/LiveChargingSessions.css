@@ -1,0 +1,237 @@
+.live-sessions {
+  padding: 24px;
+  margin-bottom: 28px;
+}
+
+.live-sessions__header,
+.live-sessions__title-row,
+.live-session__top,
+.live-session__person,
+.live-session__status,
+.live-session__actions,
+.live-session-stop-actions {
+  display: flex;
+  align-items: center;
+}
+
+.live-sessions__header {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.live-sessions__title-row {
+  gap: 9px;
+}
+
+.live-sessions h3 {
+  margin: 0;
+  font: 700 1.5rem Georgia, "Times New Roman", serif;
+  letter-spacing: .02em;
+}
+
+.live-sessions__header p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+
+.live-sessions__refresh,
+.live-session__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.live-sessions__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.live-session {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.live-session__top {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-session__top > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.live-session__eyebrow {
+  color: var(--primary);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.live-session__person {
+  gap: 10px;
+  padding: 15px 0;
+  margin: 14px 0;
+  border-block: 1px solid var(--border);
+}
+
+.live-session__person > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.live-session__person span,
+.live-session__status {
+  color: var(--text-muted);
+  font-size: .76rem;
+}
+
+.live-session__metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.live-session__metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.live-session__metrics span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: .72rem;
+}
+
+.live-session__bill {
+  color: var(--primary);
+}
+
+.live-session__status {
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.live-session__actions {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.live-session__actions button {
+  flex: 1;
+  min-height: 34px;
+}
+
+.live-session__actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.live-sessions__state {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.live-sessions__state--error {
+  color: var(--danger);
+}
+
+.live-session-details {
+  margin: 0;
+}
+
+.live-session-details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.live-session-details dt {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.live-session-details dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.live-session-stop-warning {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 18px;
+  border: 1px solid var(--danger-tint-border);
+  border-radius: 8px;
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.live-session-stop-warning p {
+  margin: 0;
+  font-size: .86rem;
+}
+
+.live-session-stop-actions {
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.live-session-stop-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+}
+
+@media (max-width: 767px) {
+  .live-sessions {
+    padding: 18px;
+  }
+
+  .live-sessions__header {
+    align-items: flex-start;
+  }
+
+  .live-sessions__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .live-sessions__header,
+  .live-session__status {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .live-sessions__refresh {
+    width: 100%;
+  }
+
+  .live-session__actions {
+    flex-direction: column;
+  }
+}

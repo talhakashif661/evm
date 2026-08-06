@@ -24,6 +24,7 @@ const Stations = lazy(() => import('./pages/Stations'));
 const StationDetail = lazy(() => import('./pages/StationDetail'));
 const Bookings = lazy(() => import('./pages/Bookings'));
 const UserHistory = lazy(() => import('./pages/UserHistory'));
+const UsageAnalytics = lazy(() => import('./pages/UsageAnalytics'));
 const AuctionHub = lazy(() => import('./pages/AuctionHub'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Payments = lazy(() => import('./pages/Payments'));
@@ -36,6 +37,7 @@ const Contact = lazy(() => import('./pages/Contact'));
 // Station owner pages
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard'));
 const StationReport = lazy(() => import('./pages/StationReport'));
+const OwnerAuctions = lazy(() => import('./pages/OwnerAuctions'));
 
 // Admin pages (merged into frontend)
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -187,6 +189,14 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/analytics"
+                    element={
+                      <PrivateRoute>
+                        <UsageAnalytics />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
                     path="/evs"
                     element={
                       <PrivateRoute>
@@ -230,6 +240,14 @@ export default function App() {
                     element={
                       <PrivateRoute roles={['STATION_OWNER']}>
                         <StationReport />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/owner/auctions"
+                    element={
+                      <PrivateRoute roles={['STATION_OWNER']}>
+                        <OwnerAuctions />
                       </PrivateRoute>
                     }
                   />

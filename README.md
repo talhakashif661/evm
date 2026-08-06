@@ -33,7 +33,7 @@ sandboxed environment doesn't have; swap in real ones once deployed):
 ## 🌐 Live Deployment
 
 Not currently deployed anywhere public. See `DEPLOYMENT.md` for the
-Render (backend) + Vercel (frontend) deployment guide, including the
+Railway (backend) + Vercel (frontend) deployment guide, including the
 environment variables and CORS/redirect configuration it needs.
 
 ---
@@ -46,7 +46,7 @@ ev-management/
 │   ├── controllers/          # MVC Controllers
 │   ├── routes/               # Express route definitions
 │   ├── middleware/           # Auth, error handling
-│   ├── utils/                # JWT, SendGrid, Prisma client
+│   ├── utils/                # JWT, Nodemailer SMTP, Prisma client
 │   ├── prisma/
 │   │   ├── schema.prisma     # MongoDB data models
 │   │   └── seed.js           # Sample data seeder
@@ -122,19 +122,25 @@ JWT_EXPIRES_IN="7d"
 PORT=5000
 CLIENT_URL="http://localhost:3000"
 
-# SendGrid (Render's free tier blocks outbound SMTP, so email goes over
-# SendGrid's HTTPS API instead of Gmail/nodemailer SMTP)
-SENDGRID_API_KEY="your_sendgrid_api_key"
-EMAIL_FROM="EV Management <noreply@evmanagement.com>"
+# SMTP email via Nodemailer. Used by OTP, verification, password reset,
+# booking, station, and auction notification emails.
+EMAIL_PROVIDER="smtp"
+SMTP_HOST="smtp.your-provider.com"
+SMTP_PORT=587
+SMTP_SECURE="false"
+SMTP_USER="your_smtp_username"
+SMTP_PASS="your_smtp_password"
+EMAIL_FROM="EV Management <noreply@your-domain.com>"
 
 NODE_ENV="development"
 ```
 
-**Getting a SendGrid API Key:**
-1. Sign up free at [sendgrid.com](https://signup.sendgrid.com) (100 emails/day on the free tier)
-2. Settings → Sender Authentication → verify the address (or domain) you'll use as `EMAIL_FROM` — sends from an unverified sender get a 403, even with a valid key
-3. Settings → API Keys → Create API Key → "Restricted Access" with at least "Mail Send" permission
-4. Copy the key into `SENDGRID_API_KEY` (shown once — if you lose it, revoke and generate a new one)
+**SMTP setup:**
+1. Use an SMTP provider or mailbox that supports app passwords/API SMTP credentials.
+2. Put the provider values into `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM`.
+3. For most providers, use port `587` with `SMTP_SECURE="false"`. Use port `465` with `SMTP_SECURE="true"` only when your provider requires implicit TLS.
+4. Make sure `EMAIL_FROM` matches a sender address/domain approved by the SMTP provider.
+**Recommended backend deployment:** Use **Railway** for the backend. Railway is preferred over Render here because this project uses outbound SMTP, and Railway is a better fit for apps that need direct SMTP connections. Deploy the backend service from `backend/`, add all backend env vars in Railway Variables, and set `CLIENT_URL` to the deployed Vercel frontend URL. Keep Vercel for the React frontend and set its API URL to the Railway backend URL.
 
 ---
 
@@ -440,7 +446,7 @@ ensuring emergency EV drivers get charging first.
 | ORM          | Prisma (MongoDB adapter)                      |
 | Database     | MongoDB Atlas                                 |
 | Auth         | JWT (jsonwebtoken) + bcryptjs                 |
-| Email        | SendGrid (HTTPS API)                          |
+| Email        | Nodemailer SMTP                               |
 | Rate Limit   | express-rate-limit                            |
 | Testing      | Jest + Supertest (backend, 54 e2e tests)      |
 | Charts       | Recharts (admin panel)                        |
@@ -455,7 +461,7 @@ ensuring emergency EV drivers get charging first.
         :3000                                      :5000
 [React Frontend]          →  Socket.IO (WS) →  [Express API]   (live bid/auction updates)
 
-[Express API]  →  [SendGrid API]  →  User Emails
+[Express API]  ->  [SMTP Provider via Nodemailer]  ->  User Emails
 [Express API]  →  [AI Service]  →  Scoring Algorithm  →  Ranked Stations
 ```
 
@@ -574,9 +580,9 @@ After running `node prisma/seed.js`:
 - Ensure DB user has read/write permissions
 
 **Email not sending:**
-- Make sure `SENDGRID_API_KEY` is set — if it's empty, `sendEmail()` logs a warning and skips sending on purpose (no crash, no retry)
-- Confirm `EMAIL_FROM`'s address is a **verified sender** in SendGrid (Settings → Sender Authentication) — an unverified sender fails with a 403
-- Check the backend logs — SendGrid's rejection reason (bad key, unverified sender, suppressed recipient, etc.) is logged there
+- Make sure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` are set. If any are missing, `sendEmail()` logs a warning and skips sending on purpose
+- Confirm `EMAIL_FROM` is allowed by your SMTP provider. Many providers require the sender address or domain to be verified
+- Check the backend logs for SMTP authentication, TLS, port, or sender errors
 - Emails are non-blocking — server won't crash if email fails
 
 **Frontend can't reach API:**
@@ -587,3 +593,4 @@ After running `node prisma/seed.js`:
 **"Slot not in auction mode" error:**
 - Station must be APPROVED before adding slots
 - Slot must be AVAILABLE before opening auction
+

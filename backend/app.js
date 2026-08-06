@@ -15,6 +15,7 @@ import stationRoutes from './routes/station.routes.js';
 import slotRoutes from './routes/slot.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import bidRoutes from './routes/bid.routes.js';
+import auctionRoutes from './routes/auction.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import paymentRoutes, { stripeWebhook } from './routes/payment.routes.js';
@@ -123,7 +124,11 @@ const complaintLimiter = rateLimit({
 // pre-auth routes above did.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  // Keep the real security ceiling in production. Local React development
+  // intentionally mounts effects twice under StrictMode and HMR/restarts can
+  // generate far more diagnostic GET traffic than a real browser session;
+  // a larger local-only ceiling prevents the developer UI locking itself out.
+  max: isProd ? 300 : 3000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -240,6 +245,7 @@ app.use('/api/stations', stationRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/bids', bidRoutes);
+app.use('/api/auctions', auctionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/payments', paymentRoutes);

@@ -2,95 +2,123 @@ import prisma from './prisma.js';
 import { sendEmail, emailTemplates } from './email.js';
 import { getIO } from './socket.js';
 import logger from './logger.js';
+import { expireAuctionReservations } from './auctionExpiry.js';
 
 const NO_SHOW_MINUTES = parseInt(process.env.NO_SHOW_MINUTES || '15');
-// Auction wins have no scheduled startTime window (they're open-ended), so a
-// 15-minute arrival cutoff doesn't apply the same way — the winner gets a
-// much longer grace period to check in before the slot is freed back up.
-const AUCTION_WIN_GRACE_HOURS = parseInt(process.env.AUCTION_WIN_GRACE_HOURS || '2');
 
-const notify = (booking, status, reason) => {
-  getIO()
-    ?.to(`user:${booking.userId}`)
-    .emit('booking:status-changed', { bookingId: booking.id, status, reason });
-  getIO()
-    ?.to(`slot:${booking.slotId}`)
-    .emit('slot:availability-changed', { slotId: booking.slotId });
-};
+const round = (value) => Number(value.toFixed(2));
 
-// A CONFIRMED booking whose planned window fully elapsed without the owner
-// marking it complete is treated as a no-show and auto-cancelled (no charge),
-// instead of sitting as "active" forever. Open-ended bookings (plannedEndTime
-// = null, i.e. auction wins) are excluded here on purpose — they're handled
-// by expireNoShowBookings' own (much longer) grace period below, since they
-// have no scheduled window to have "fully elapsed" in the first place.
-// Called lazily from read paths rather than a cron job, matching this
-// codebase's existing syncSlotStatus pattern.
-export const expireStaleBookings = async (extraWhere = {}) => {
-  await prisma.booking.updateMany({
-    where: {
-      status: { in: ['PENDING', 'CONFIRMED'] },
-      plannedEndTime: { not: null, lt: new Date() },
-      ...extraWhere,
-    },
-    data: { status: 'CANCELLED', cancelReason: 'NO_SHOW' },
-  });
+const notify = (booking, status, reason, slotReleased) => {
+  const payload = {
+    bookingId: booking.id,
+    slotId: booking.slotId,
+    status,
+    reason,
+    slotStatus: slotReleased ? 'AVAILABLE' : booking.slot.status,
+  };
+  const io = getIO();
+  io?.to(`user:${booking.userId}`).emit('booking:status-changed', payload);
+  io?.to(`user:${booking.slot.station.ownerId}`).emit('booking:expired', payload);
+  io?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', payload);
 };
 
 /**
- * Two distinct "never claimed" cases, swept together since both are a
- * CONFIRMED booking nobody checked into:
- *  - windowed bookings: cancelled NO_SHOW_MINUTES after their scheduled startTime.
- *  - open-ended (auction-win) bookings: no scheduled window to be late for, so
- *    they instead get a much longer AUCTION_WIN_GRACE_HOURS from creation —
- *    previously this sweep had no plannedEndTime guard at all, so auction
- *    wins were wrongly getting caught by the 15-minute windowed-booking
- *    cutoff instead.
- * Needs a per-row email + socket notification, so it can't be a bulk updateMany.
+ * Atomically claim one still-confirmed booking and release its slot. The
+ * status predicate is a distributed lock: only one overlapping scheduler or
+ * lazy read-path sweep can claim the row, so notifications are sent once.
+ */
+const expireBookingAndReleaseSlot = (booking, reason) =>
+  prisma.$transaction(async (tx) => {
+    const claimed = await tx.booking.updateMany({
+      where: { id: booking.id, status: 'CONFIRMED' },
+      data: { status: 'CANCELLED', cancelReason: reason },
+    });
+    if (claimed.count !== 1) return { expired: false, slotReleased: false };
+
+    const released = await tx.slot.updateMany({
+      where: {
+        id: booking.slotId,
+        status: { notIn: ['OFFLINE', 'FAULTED', 'MAINTENANCE'] },
+      },
+      data: { status: 'AVAILABLE' },
+    });
+    return { expired: true, slotReleased: released.count === 1 };
+  });
+
+// Compatibility wrapper for existing imports. The former bulk update could
+// race the notified sweep and silently cancel a booking without releasing its
+// slot; every no-show now goes through the single atomic implementation.
+export const expireStaleBookings = async (extraWhere = {}) =>
+  expireNoShowBookings(extraWhere);
+
+/**
+ * Expire unclaimed scheduled (windowed) bookings: 15 minutes after their
+ * start time. Auction-win bookings (plannedEndTime null) are never matched
+ * here — their confirmation window is the auction's own configured Slot
+ * Reservation Time, tracked via reservationDeadline and enforced by
+ * utils/auctionExpiry.js's expireAuctionReservations instead, which cascades
+ * to the next-ranked bidder rather than just releasing the slot.
  */
 export const expireNoShowBookings = async (extraWhere = {}) => {
   const cutoff = new Date(Date.now() - NO_SHOW_MINUTES * 60 * 1000);
-  const abandonedCutoff = new Date(Date.now() - AUCTION_WIN_GRACE_HOURS * 60 * 60 * 1000);
   const stale = await prisma.booking.findMany({
     where: {
       status: 'CONFIRMED',
-      OR: [
-        { plannedEndTime: { not: null }, startTime: { lt: cutoff } },
-        { plannedEndTime: null, startTime: { lt: abandonedCutoff } },
-      ],
+      plannedEndTime: { not: null },
+      startTime: { lt: cutoff },
       ...extraWhere,
     },
     include: {
       user: { select: { name: true, email: true } },
-      slot: { select: { slotNumber: true, station: { select: { name: true } } } },
+      slot: {
+        select: {
+          status: true,
+          slotNumber: true,
+          station: {
+            select: {
+              name: true,
+              ownerId: true,
+              owner: { select: { name: true, email: true } },
+            },
+          },
+        },
+      },
     },
   });
 
+  let expiredCount = 0;
   for (const booking of stale) {
-    const isAuctionWin = !booking.plannedEndTime;
-    const reason = isAuctionWin ? 'AUCTION_WIN_ABANDONED' : 'NO_SHOW';
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: { status: 'CANCELLED', cancelReason: reason },
-    });
+    const reason = 'NO_SHOW';
+    const result = await expireBookingAndReleaseSlot(booking, reason);
+    if (!result.expired) continue;
+    expiredCount += 1;
 
-    const template = isAuctionWin ? emailTemplates.auctionWinExpired : emailTemplates.bookingNoShow;
-    const { subject, html } = template(booking.user.name, {
+    const customerEmail = emailTemplates.bookingNoShow(booking.user.name, {
       stationName: booking.slot.station.name,
       slotNumber: booking.slot.slotNumber,
       noShowMinutes: NO_SHOW_MINUTES,
     });
-    sendEmail({ to: booking.user.email, subject, html });
-    notify(booking, 'CANCELLED', reason);
+    sendEmail({ to: booking.user.email, ...customerEmail });
+
+    const ownerEmail = emailTemplates.ownerBookingExpired(booking.slot.station.owner.name, {
+      customerName: booking.user.name,
+      stationName: booking.slot.station.name,
+      slotNumber: booking.slot.slotNumber,
+      slotReleased: result.slotReleased,
+    });
+    sendEmail({ to: booking.slot.station.owner.email, ...ownerEmail });
+    notify(booking, 'CANCELLED', reason, result.slotReleased);
   }
 
-  if (stale.length) logger.info(`Auto-cancelled ${stale.length} no-show/abandoned booking(s)`);
-  return stale.length;
+  if (expiredCount) {
+    logger.info(`Auto-cancelled ${expiredCount} no-show booking(s)`);
+  }
+  return expiredCount;
 };
 
 /**
- * A CHECKED_IN booking whose paymentDeadline has passed without a completed
- * payment is cancelled, freeing the slot immediately for other users.
+ * A checked-in booking whose payment deadline passed is cancelled. This
+ * existing flow remains separate from the scheduled no-show transaction.
  */
 export const expirePaymentTimeouts = async (extraWhere = {}) => {
   const now = new Date();
@@ -103,26 +131,133 @@ export const expirePaymentTimeouts = async (extraWhere = {}) => {
   });
 
   for (const booking of stale) {
-    await prisma.booking.update({
-      where: { id: booking.id },
+    const claimed = await prisma.booking.updateMany({
+      where: { id: booking.id, status: 'CHECKED_IN' },
       data: { status: 'CANCELLED', cancelReason: 'PAYMENT_TIMEOUT' },
     });
+    if (claimed.count !== 1) continue;
 
-    const { subject, html } = emailTemplates.bookingPaymentTimeout(booking.user.name, {
+    // Physical fault states must win over session churn (same rule as the
+    // no-show and completed-session release paths).
+    const released = await prisma.slot.updateMany({
+      where: {
+        id: booking.slotId,
+        status: { notIn: ['MAINTENANCE', 'OFFLINE', 'FAULTED'] },
+      },
+      data: { status: 'AVAILABLE' },
+    });
+
+    const email = emailTemplates.bookingPaymentTimeout(booking.user.name, {
       stationName: booking.slot.station.name,
       slotNumber: booking.slot.slotNumber,
     });
-    sendEmail({ to: booking.user.email, subject, html });
-    notify(booking, 'CANCELLED', 'PAYMENT_TIMEOUT');
+    sendEmail({ to: booking.user.email, ...email });
+    getIO()?.to(`user:${booking.userId}`).emit('booking:status-changed', {
+      bookingId: booking.id,
+      status: 'CANCELLED',
+      reason: 'PAYMENT_TIMEOUT',
+      slotStatus: released.count === 1 ? 'AVAILABLE' : undefined,
+    });
+    getIO()?.to(`slot:${booking.slotId}`).emit('slot:availability-changed', {
+      slotId: booking.slotId,
+      slotStatus: released.count === 1 ? 'AVAILABLE' : undefined,
+    });
   }
 
-  if (stale.length) logger.info(`Auto-cancelled ${stale.length} payment-timeout booking(s)`);
+  if (stale.length) {
+    logger.info(`Auto-cancelled ${stale.length} payment-timeout booking(s)`);
+  }
   return stale.length;
 };
 
-/** Runs all three sweeps together — the single call read paths should use. */
+/**
+ * Auto-complete an ACTIVE (charging) booking once its reserved window
+ * (plannedEndTime) has passed — same idea as a customer unplugging right on
+ * time. Mirrors the owner's manual completeBooking (booking.controller.js),
+ * but ends exactly at plannedEndTime rather than whenever this sweep happens
+ * to run, so a slow tick never bills the customer for time it didn't cause.
+ * Auction-win bookings (plannedEndTime null) are open-ended and never
+ * matched here — they can only be ended via emergency-stop or manual
+ * completion, same as expireNoShowBookings above.
+ */
+export const completeFinishedChargingSessions = async (extraWhere = {}) => {
+  const now = new Date();
+  const finished = await prisma.booking.findMany({
+    where: {
+      status: 'ACTIVE',
+      plannedEndTime: { not: null, lte: now },
+      ...extraWhere,
+    },
+    include: {
+      slot: {
+        select: {
+          id: true,
+          status: true,
+          powerKw: true,
+          station: { select: { id: true, ownerId: true, pricePerKwh: true } },
+        },
+      },
+    },
+  });
+
+  let completedCount = 0;
+  for (const booking of finished) {
+    const endTime = new Date(booking.plannedEndTime);
+    const startedAt = new Date(
+      booking.chargingStartedAt || booking.checkInTime || booking.startTime
+    );
+    const durationHours = Math.max((endTime - startedAt) / 3600000, 0);
+    const finalEnergyKwh = round(durationHours * (booking.slot.powerKw || 0));
+    const ratePerKwh = booking.ratePerKwh ?? booking.slot.station.pricePerKwh;
+
+    // Status predicate is a distributed lock, same as expireBookingAndReleaseSlot
+    // above — only one overlapping scheduler/lazy-sweep can claim this row.
+    const claimed = await prisma.booking.updateMany({
+      where: { id: booking.id, status: 'ACTIVE' },
+      data: {
+        status: 'COMPLETED',
+        endTime,
+        finalEnergyKwh,
+        durationMinutes: Math.round(durationHours * 60),
+        finalBill: round(finalEnergyKwh * ratePerKwh),
+        ratePerKwh,
+      },
+    });
+    if (claimed.count !== 1) continue;
+    completedCount += 1;
+
+    // Physical fault states must win over session churn (same rule as the
+    // emergency-stop and no-show release paths).
+    const released = await prisma.slot.updateMany({
+      where: {
+        id: booking.slot.id,
+        status: { notIn: ['MAINTENANCE', 'OFFLINE', 'FAULTED'] },
+      },
+      data: { status: 'AVAILABLE' },
+    });
+
+    const payload = {
+      bookingId: booking.id,
+      slotId: booking.slot.id,
+      status: 'COMPLETED',
+      endTime,
+      slotStatus: released.count === 1 ? 'AVAILABLE' : booking.slot.status,
+    };
+    const io = getIO();
+    io?.to(`user:${booking.userId}`).emit('booking:status-changed', payload);
+    io?.to(`user:${booking.slot.station.ownerId}`).emit('booking:status-changed', payload);
+    io?.to(`slot:${booking.slot.id}`).emit('slot:availability-changed', payload);
+  }
+
+  if (completedCount) {
+    logger.info(`Auto-completed ${completedCount} finished charging session(s)`);
+  }
+  return completedCount;
+};
+
 export const expireAllStaleBookings = async (extraWhere = {}) => {
-  await expireStaleBookings(extraWhere);
   await expireNoShowBookings(extraWhere);
   await expirePaymentTimeouts(extraWhere);
+  await expireAuctionReservations(extraWhere);
+  await completeFinishedChargingSessions(extraWhere);
 };

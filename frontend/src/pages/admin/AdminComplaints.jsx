@@ -1,13 +1,65 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
+import { toast } from 'react-toastify';
 import { Inbox, Mail, MessageCircle, Trash2, Phone, User } from 'lucide-react';
 import { fetchComplaints, deleteComplaint } from '../../store/slices/adminComplaintsSlice';
 import { EmptyState } from '../../components/Spinner';
 import { Skeleton } from '../../components/Skeleton';
+import Pagination from '../../components/Pagination.jsx';
 import SEO from '../../components/SEO';
 
 const waDigits = (phone) => phone.replace(/\D/g, '');
+
+const isValidEmail = (email) =>
+  typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+const complaintReplyText = (c) => {
+  const subject = 'Response to Your Complaint - Unified EV';
+  const body = `Hello,
+
+Thank you for contacting Unified EV.
+
+Complaint:
+"${c.subject}"
+
+Message:
+"${c.message}"
+
+Response:
+
+
+Best regards,
+Unified EV Support Team`;
+  return { subject, body };
+};
+
+// Gmail's web compose view — falls back to the system mail client (via
+// mailto) when Gmail can't be opened, e.g. a popup blocker or the user
+// isn't signed into a Google account in this browser.
+const openGmailReply = (c) => {
+  if (!isValidEmail(c.email)) {
+    toast.error('This complaint has no valid email address to reply to.');
+    return;
+  }
+  const { subject, body } = complaintReplyText(c);
+  const mailto = `mailto:${c.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(c.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  let gmailWindow;
+  try {
+    // No noopener/noreferrer: keeping the window reference is what lets us
+    // detect a popup blocker below and fall back to mailto.
+    gmailWindow = window.open(gmailUrl, '_blank');
+  } catch {
+    gmailWindow = null;
+  }
+
+  if (!gmailWindow || gmailWindow.closed || typeof gmailWindow.closed === 'undefined') {
+    toast.error('Gmail popup was blocked — opening your default email app instead.');
+    window.location.href = mailto;
+  }
+};
 
 export default function AdminComplaints() {
   const dispatch = useDispatch();
@@ -30,7 +82,7 @@ export default function AdminComplaints() {
     <div>
       <SEO
         title="User Complaints"
-        description="View and respond to user complaints and support requests submitted through the ChargeEV platform."
+        description="View and respond to user complaints and support requests submitted through the Unified EV platform."
         noIndex
       />
       <div style={{ marginBottom: 24 }}>
@@ -61,7 +113,7 @@ export default function AdminComplaints() {
         />
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="list-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {complaints.map((c, i) => (
               <motion.div
                 key={c.id}
@@ -147,7 +199,7 @@ export default function AdminComplaints() {
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {c.phone && (
                     <a
-                      href={`https://wa.me/${waDigits(c.phone)}?text=${encodeURIComponent(`Hi ${c.name}, this is the ChargeEV admin team regarding your complaint "${c.subject}".`)}`}
+                      href={`https://wa.me/${waDigits(c.phone)}?text=${encodeURIComponent(`Hi ${c.name}, this is the Unified EV admin team regarding your complaint "${c.subject}".`)}`}
                       target="_blank"
                       rel="noreferrer"
                       className="btn-outline"
@@ -163,7 +215,11 @@ export default function AdminComplaints() {
                     </a>
                   )}
                   <a
-                    href={`mailto:${c.email}?subject=${encodeURIComponent(`Re: ${c.subject} — ChargeEV`)}`}
+                    href={`mailto:${c.email}?subject=${encodeURIComponent(complaintReplyText(c).subject)}&body=${encodeURIComponent(complaintReplyText(c).body)}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openGmailReply(c);
+                    }}
                     className="btn-outline"
                     style={{
                       display: 'inline-flex',
@@ -194,31 +250,14 @@ export default function AdminComplaints() {
             ))}
           </div>
 
-          {pagination && pagination.pages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-              <button
-                className="btn-outline"
-                style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </button>
-              <span
-                style={{ alignSelf: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}
-              >
-                Page {pagination.page} of {pagination.pages}
-              </span>
-              <button
-                className="btn-outline"
-                style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                disabled={page >= pagination.pages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={pagination?.pages}
+            onChange={setPage}
+            variant="standalone"
+            total={pagination?.total}
+            limit={10}
+          />
         </>
       )}
     </div>

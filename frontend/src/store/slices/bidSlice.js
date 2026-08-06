@@ -11,14 +11,17 @@ export const placeBid = createAsyncThunk('bids/place', async (data, { rejectWith
   }
 });
 
-export const fetchMyBids = createAsyncThunk('bids/fetchMine', async (_, { rejectWithValue }) => {
-  try {
-    const res = await api.get('/bids/mine');
-    return res.data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message);
+export const fetchMyBids = createAsyncThunk(
+  'bids/fetchMine',
+  async ({ status, page = 1, limit = 10 } = {}, { rejectWithValue }) => {
+    try {
+      const res = await api.get('/bids/mine', { params: { status, page, limit } });
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
   }
-});
+);
 
 export const fetchSlotBids = createAsyncThunk(
   'bids/fetchSlot',
@@ -34,9 +37,9 @@ export const fetchSlotBids = createAsyncThunk(
 
 export const fetchAuctionResults = createAsyncThunk(
   'bids/results',
-  async (_, { rejectWithValue }) => {
+  async ({ page = 1, limit = 10 } = {}, { rejectWithValue }) => {
     try {
-      const res = await api.get('/bids/results');
+      const res = await api.get('/bids/results', { params: { page, limit } });
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message);
@@ -55,7 +58,17 @@ export const cancelBid = createAsyncThunk('bids/cancel', async (id, { rejectWith
 
 const bidSlice = createSlice({
   name: 'bids',
-  initialState: { bids: [], slotBids: [], results: [], loading: false, lastBidResult: null },
+  initialState: {
+    bids: [],
+    bidsPagination: null,
+    bidsLoading: false,
+    slotBids: [],
+    results: [],
+    resultsPagination: null,
+    resultsLoading: false,
+    loading: false,
+    lastBidResult: null,
+  },
   reducers: {},
   extraReducers: (builder) => {
     builder
@@ -73,14 +86,30 @@ const bidSlice = createSlice({
         state.loading = false;
         toast.error(action.payload);
       })
+      .addCase(fetchMyBids.pending, (state) => {
+        state.bidsLoading = true;
+      })
       .addCase(fetchMyBids.fulfilled, (state, action) => {
+        state.bidsLoading = false;
         state.bids = action.payload.data;
+        state.bidsPagination = action.payload.pagination || null;
+      })
+      .addCase(fetchMyBids.rejected, (state) => {
+        state.bidsLoading = false;
       })
       .addCase(fetchSlotBids.fulfilled, (state, action) => {
         state.slotBids = action.payload.data;
       })
+      .addCase(fetchAuctionResults.pending, (state) => {
+        state.resultsLoading = true;
+      })
       .addCase(fetchAuctionResults.fulfilled, (state, action) => {
+        state.resultsLoading = false;
         state.results = action.payload.data;
+        state.resultsPagination = action.payload.pagination || null;
+      })
+      .addCase(fetchAuctionResults.rejected, (state) => {
+        state.resultsLoading = false;
       })
       .addCase(cancelBid.fulfilled, (state, action) => {
         state.bids = state.bids.filter((b) => b.id !== action.payload);

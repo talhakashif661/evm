@@ -34,7 +34,7 @@ export default function Login() {
     >
       <SEO
         title="Log In"
-        description="Log in to your ChargeEV account to book charging stations, track your sessions, and manage your EVs."
+        description="Log in to your Unified EV account to book charging stations, track your sessions, and manage your EVs."
         noIndex
       />
       <motion.div

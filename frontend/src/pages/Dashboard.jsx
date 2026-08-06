@@ -53,7 +53,12 @@ export default function Dashboard() {
     // to re-run once the role is known, not just fire once on mount.
   }, [dispatch, user?.role]);
 
-  const activeBookings = bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.status));
+  // Named "upcoming" rather than "active" so it doesn't collide with the
+  // Bookings page's ACTIVE tab, which means something narrower and different
+  // there (status === 'ACTIVE', i.e. paid and currently charging). This
+  // stat is reserved-or-in-progress: CONFIRMED (booked, not yet checked in)
+  // plus ACTIVE.
+  const upcomingBookings = bookings.filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.status));
   const completedBookings = bookings.filter((b) => b.status === 'COMPLETED');
 
   return (
@@ -65,7 +70,7 @@ export default function Dashboard() {
     >
       <SEO
         title="Your EV Charging Dashboard"
-        description="Track your charging sessions, view stats, and manage your EV charging activity — all from your ChargeEV dashboard."
+        description="Track your charging sessions, view stats, and manage your EV charging activity — all from your Unified EV dashboard."
         noIndex
       />
 
@@ -121,8 +126,8 @@ export default function Dashboard() {
                 </div>
                 <div className="col-6 col-md-3">
                   <StatCard
-                    label="Active Bookings"
-                    value={activeBookings.length}
+                    label="Upcoming Bookings"
+                    value={upcomingBookings.length}
                     icon={<Calendar size={22} />}
                     color="var(--info)"
                   />
@@ -316,7 +321,7 @@ export default function Dashboard() {
                         </p>
                       </div>
                       <span
-                        className={`badge-${b.status === 'COMPLETED' ? 'gold' : b.status === 'CANCELLED' ? 'danger' : b.status === 'CONFIRMED' ? 'info' : 'warning'}`}
+                        className={`badge-${b.status === 'COMPLETED' ? 'success' : b.status === 'CANCELLED' ? 'cancelled' : b.status === 'CONFIRMED' ? 'info' : 'warning'}`}
                       >
                         {b.status}
                       </span>

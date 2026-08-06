@@ -32,7 +32,10 @@ export const activateBookingPayment = async ({ bookingId, method, stripePaymentI
       stripePaymentIntentId,
     },
   });
-  await prisma.booking.update({ where: { id: bookingId }, data: { status: 'ACTIVE' } });
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { status: 'ACTIVE', chargingStartedAt: new Date() },
+  });
   await prisma.chargingStation.update({
     where: { id: booking.slot.stationId },
     data: { totalRevenue: { increment: booking.totalCost } },

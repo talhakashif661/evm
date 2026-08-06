@@ -4,6 +4,7 @@ import evReducer from './slices/evSlice';
 import stationReducer from './slices/stationSlice';
 import bookingReducer from './slices/bookingSlice';
 import bidReducer from './slices/bidSlice';
+import auctionReducer from './slices/auctionSlice';
 import aiReducer from './slices/aiSlice';
 import verificationReducer from './slices/verificationSlice';
 // Admin slices (merged into frontend)
@@ -21,6 +22,7 @@ export const store = configureStore({
     stations: stationReducer,
     bookings: bookingReducer,
     bids: bidReducer,
+    auctions: auctionReducer,
     ai: aiReducer,
     verification: verificationReducer,
     adminDashboard: adminDashboardReducer,

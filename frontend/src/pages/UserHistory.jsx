@@ -15,7 +15,7 @@ const statusBadge = (s) => {
     COMPLETED: 'badge-success',
     CONFIRMED: 'badge-primary',
     ACTIVE: 'badge-warning',
-    CANCELLED: 'badge-danger',
+    CANCELLED: 'badge-cancelled',
   };
   return map[s] || 'badge-info';
 };
@@ -28,17 +28,10 @@ export default function UserHistory() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
 
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/bookings?page=${page}&limit=15`);
+      const res = await api.get(`/bookings?page=${page}&limit=10`);
       setHistory(res.data.data || []);
       setPagination(res.data.pagination);
     } catch (e) {
@@ -47,6 +40,13 @@ export default function UserHistory() {
       setLoading(false);
     }
   }, [page]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   // Stats must reflect the user's ENTIRE history, not just the current
   // 15-row page — fetched separately so pagination doesn't skew the totals.
@@ -65,8 +65,11 @@ export default function UserHistory() {
             (b.slot?.powerKw || 0) * ((new Date(b.endTime) - new Date(b.startTime)) / 3600000 || 0),
           0
         ),
-        // Only count what was actually paid, not just billed.
-        totalSpent: completed.filter((b) => b.payment).reduce((a, b) => a + (b.totalCost || 0), 0),
+        // Only count what was actually paid, not just billed — net of any
+        // refund (e.g. the unused portion returned after an emergency stop).
+        totalSpent: completed
+          .filter((b) => b.payment && b.payment.status !== 'REFUNDED')
+          .reduce((a, b) => a + (b.totalCost || 0) - (b.payment?.refundedAmount || 0), 0),
       });
     } catch (e) {
       logger.error(e);
@@ -230,7 +233,7 @@ export default function UserHistory() {
           </div>
         ) : (
           <div className="ev-card" style={{ overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-scroll">
               <table className="ev-table">
                 <thead>
                   <tr>
@@ -263,7 +266,7 @@ export default function UserHistory() {
                         animate={{ opacity: 1, transition: { delay: i * 0.03 } }}
                       >
                         <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                          {(page - 1) * 15 + i + 1}
+                          {(page - 1) * 10 + i + 1}
                         </td>
                         <td>
                           <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>
@@ -338,6 +341,8 @@ export default function UserHistory() {
               totalPages={pagination?.pages}
               onChange={setPage}
               variant="table"
+              total={pagination?.total}
+              limit={10}
             />
           </div>
         )}

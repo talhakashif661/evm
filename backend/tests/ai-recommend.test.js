@@ -19,7 +19,11 @@ import request from 'supertest';
 process.env.JWT_SECRET = 'ai-test-secret';
 process.env.JWT_EXPIRES_IN = '1h';
 process.env.NODE_ENV = 'test';
-delete process.env.SENDGRID_API_KEY;
+delete process.env.SMTP_HOST;
+delete process.env.SMTP_PORT;
+delete process.env.SMTP_USER;
+delete process.env.SMTP_PASS;
+delete process.env.EMAIL_FROM;
 
 const { createInMemoryPrisma } = await import('./helpers/inMemoryPrisma.js');
 const mockPrisma = createInMemoryPrisma();

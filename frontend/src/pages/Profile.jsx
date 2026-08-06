@@ -95,7 +95,7 @@ export default function Profile() {
     <div className="page-container" style={{ maxWidth: 680, padding: '44px 32px' }}>
       <SEO
         title="Profile Settings"
-        description="Update your profile, change your password, and manage your ChargeEV account preferences."
+        description="Update your profile, change your password, and manage your Unified EV account preferences."
         noIndex
       />
       <div style={{ marginBottom: 32 }}>

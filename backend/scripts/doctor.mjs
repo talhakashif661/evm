@@ -50,7 +50,29 @@ if (missing.length === 0) {
   );
 }
 
-// 3. Prisma client generated
+// 3. SMTP email configuration.
+const smtpRequired = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM'];
+const missingSmtp = smtpRequired.filter((key) => !process.env[key]);
+if (missingSmtp.length > 0) {
+  fail(
+    `SMTP email env var(s) missing: ${missingSmtp.join(', ')}`,
+    'Set SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, and EMAIL_FROM in backend/.env.'
+  );
+} else {
+  pass('SMTP email env vars are set');
+}
+
+const emailFrom = process.env.EMAIL_FROM || '';
+if (!emailFrom || /noreply@example\.com|example\.com/i.test(emailFrom)) {
+  fail(
+    'EMAIL_FROM is missing or still contains a placeholder',
+    'Set EMAIL_FROM to the sender address approved by your SMTP provider.'
+  );
+} else {
+  pass('EMAIL_FROM is configured');
+}
+
+// 4. Prisma client generated
 const clientGenerated = existsSync(join(root, 'node_modules/.prisma/client'));
 if (clientGenerated) {
   pass('Prisma client generated');
@@ -66,9 +88,9 @@ if (clientGenerated) {
 if (missing.length === 0 && clientGenerated) {
   try {
     const { default: prisma } = await import('../utils/prisma.js');
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$runCommandRaw({ ping: 1 });
     await prisma.$disconnect();
-    pass('database reachable (SELECT 1 succeeded)');
+    pass('database reachable (MongoDB ping succeeded)');
   } catch (err) {
     fail(
       `database not reachable: ${err.message.split('\n')[0]}`,

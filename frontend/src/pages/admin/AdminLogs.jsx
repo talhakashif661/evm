@@ -15,6 +15,7 @@ import {
 import { fetchLogs } from '../../store/slices/adminLogsSlice';
 import { EmptyState } from '../../components/Spinner';
 import { Skeleton } from '../../components/Skeleton';
+import Pagination from '../../components/Pagination.jsx';
 import SEO from '../../components/SEO';
 
 // Action -> presentation. Falls back to a neutral badge for future actions.
@@ -60,14 +61,14 @@ export default function AdminLogs() {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    dispatch(fetchLogs({ page, limit: 25 }));
+    dispatch(fetchLogs({ page, limit: 10 }));
   }, [dispatch, page]);
 
   return (
     <div>
       <SEO
         title="Audit Logs"
-        description="Review administrative audit logs tracking key actions across the ChargeEV platform."
+        description="Review administrative audit logs tracking key actions across the Unified EV platform."
         noIndex
       />
       <div style={{ marginBottom: 24 }}>
@@ -96,7 +97,8 @@ export default function AdminLogs() {
         />
       ) : (
         <>
-          <div className="ev-card" style={{ padding: 0, overflowX: 'auto' }}>
+          <div className="ev-card" style={{ padding: 0 }}>
+          <div className="table-scroll">
             <table className="ev-table">
               <thead>
                 <tr>
@@ -143,32 +145,16 @@ export default function AdminLogs() {
               </tbody>
             </table>
           </div>
+          </div>
 
-          {pagination && pagination.pages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-              <button
-                className="btn-outline"
-                style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </button>
-              <span
-                style={{ alignSelf: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}
-              >
-                Page {pagination.page} of {pagination.pages}
-              </span>
-              <button
-                className="btn-outline"
-                style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                disabled={page >= pagination.pages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={pagination?.pages}
+            onChange={setPage}
+            variant="standalone"
+            total={pagination?.total}
+            limit={10}
+          />
         </>
       )}
     </div>

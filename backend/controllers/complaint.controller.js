@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma.js';
 import { audit } from '../utils/audit.js';
 import { verifyToken } from '../utils/jwt.js';
+import { paginationMeta } from '../utils/pagination.js';
 
 /**
  * POST /api/complaints — public.
@@ -62,7 +63,7 @@ export const getComplaints = async (req, res, next) => {
     res.json({
       success: true,
       data: complaints,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
+      pagination: paginationMeta(total, Math.max(parseInt(page) || 1, 1), take),
     });
   } catch (error) {
     next(error);

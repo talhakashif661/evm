@@ -5,12 +5,13 @@ import { motion } from 'framer-motion';
 import { MapPin, Wallet, Phone, Zap, Trophy, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Skeleton, SkeletonRow } from '../components/Skeleton';
+import Pagination from '../components/Pagination.jsx';
 import { toast } from 'react-toastify';
 import { fetchStationById } from '../store/slices/stationSlice';
 import { createBooking } from '../store/slices/bookingSlice';
 import { placeBid, fetchSlotBids } from '../store/slices/bidSlice';
 import { fetchMyEVs } from '../store/slices/evSlice';
-import { Modal, SlotStatusBadge, Countdown } from '../components/Spinner';
+import { Modal, SlotStatusBadge, Countdown, EmptyState } from '../components/Spinner';
 import { Stars, StarInput } from '../components/Stars';
 import api from '../utils/api';
 import { toPKR } from '../utils/pkr';
@@ -35,7 +36,13 @@ export default function StationDetail() {
   const { slotBids, loading: bidLoading } = useSelector((s) => s.bids);
   const { token, user } = useSelector((s) => s.auth);
   const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsPagination, setReviewsPagination] = useState(null);
   const [reviewStats, setReviewStats] = useState({ ratingAvg: 0, ratingCount: 0 });
+  // The logged-in user's own review, fetched independently of the (paginated)
+  // list above — it may not be on whichever page is currently loaded.
+  const [myReview, setMyReview] = useState(null);
   const [reviewModal, setReviewModal] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [savingReview, setSavingReview] = useState(false);
@@ -45,11 +52,48 @@ export default function StationDetail() {
   const [bidForm, setBidForm] = useState({ amount: '', batteryLevel: '' });
   const [slotAvailability, setSlotAvailability] = useState({}); // slotId -> [{startTime, plannedEndTime}]
 
+  const fetchReviews = useCallback(
+    async (page = 1) => {
+      setReviewsLoading(true);
+      try {
+        const res = await api.get(`/reviews/station/${id}`, { params: { page, limit: 10 } });
+        setReviews(res.data.data || []);
+        setReviewStats(res.data.stats || { ratingAvg: 0, ratingCount: 0 });
+        setReviewsPagination(res.data.pagination || null);
+      } catch {
+        /* reviews are non-critical decoration */
+      } finally {
+        setReviewsLoading(false);
+      }
+    },
+    [id]
+  );
+
+  const fetchMyReview = useCallback(async () => {
+    if (!token) {
+      setMyReview(null);
+      return;
+    }
+    try {
+      const res = await api.get(`/reviews/station/${id}/mine`);
+      setMyReview(res.data.data || null);
+    } catch {
+      /* non-critical decoration, same as fetchReviews */
+    }
+  }, [id, token]);
+
   useEffect(() => {
     dispatch(fetchStationById(id));
-    fetchReviews();
     if (token) dispatch(fetchMyEVs());
-  }, [dispatch, id, fetchReviews, token]);
+  }, [dispatch, id, token]);
+
+  useEffect(() => {
+    fetchReviews(reviewsPage);
+  }, [fetchReviews, reviewsPage]);
+
+  useEffect(() => {
+    fetchMyReview();
+  }, [fetchMyReview]);
 
   // Live-availability UX: fetch each slot's upcoming booked windows so users
   // can see conflicts before attempting to book, instead of only finding out
@@ -110,18 +154,6 @@ export default function StationDetail() {
     });
   };
 
-  const fetchReviews = useCallback(async () => {
-    try {
-      const res = await api.get(`/reviews/station/${id}`);
-      setReviews(res.data.data || []);
-      setReviewStats(res.data.stats || { ratingAvg: 0, ratingCount: 0 });
-    } catch {
-      /* reviews are non-critical decoration */
-    }
-  }, [id]);
-
-  const myReview = reviews.find((r) => r.user?.id === user?.id);
-
   const openReviewModal = () => {
     setReviewForm(
       myReview
@@ -138,7 +170,9 @@ export default function StationDetail() {
       const res = await api.post('/reviews', { stationId: id, ...reviewForm });
       toast.success(res.data.message);
       setReviewModal(false);
-      fetchReviews();
+      setReviewsPage(1);
+      fetchReviews(1);
+      fetchMyReview();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not save review');
     } finally {
@@ -151,7 +185,9 @@ export default function StationDetail() {
     try {
       await api.delete(`/reviews/${myReview.id}`);
       toast.info('Review deleted');
-      fetchReviews();
+      setReviewsPage(1);
+      fetchReviews(1);
+      fetchMyReview();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not delete review');
     }
@@ -169,7 +205,7 @@ export default function StationDetail() {
         slotId: bookingModal.id,
         evId: bookForm.evId,
         startTime: bookForm.startTime,
-        durationMinutes: bookForm.durationMinutes,
+        durationMinutes: parseInt(bookForm.durationMinutes) || 0,
       })
     );
     if (!res.error) {
@@ -267,11 +303,57 @@ export default function StationDetail() {
       review: reviews.slice(0, 5).map((r) => ({
         '@type': 'Review',
         reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
-        author: { '@type': 'Person', name: r.user?.name || 'ChargeEV user' },
+        author: { '@type': 'Person', name: r.user?.name || 'Unified EV user' },
         ...(r.comment && { reviewBody: r.comment }),
         datePublished: r.createdAt,
       })),
     }),
+  };
+
+  // EV users never set the starting price — the minimum they can bid comes
+  // straight from the station owner's auction config plus whatever's already
+  // leading (mirrors the server-side check in bid.controller.js's placeBid).
+  const highestBidAmount = slotBids.length ? Math.max(...slotBids.map((b) => b.amount)) : 0;
+  const minRequiredBid = highestBidAmount
+    ? highestBidAmount + (bidModal?.auctionMinIncrement || 0)
+    : bidModal?.auctionStartingBid || 0.01;
+
+  // Custom booking duration: start/end/cost/available-time all derived from
+  // the user's typed minutes and this slot's real booked windows (fetched
+  // into slotAvailability), never from a fixed list of preset durations.
+  const bookDurationMinutes = parseInt(bookForm.durationMinutes) || 0;
+  const bookStart = bookForm.startTime ? new Date(bookForm.startTime) : null;
+  const bookPlannedEnd =
+    bookStart && bookDurationMinutes > 0
+      ? new Date(bookStart.getTime() + bookDurationMinutes * 60 * 1000)
+      : null;
+  const bookConflict =
+    bookingModal && bookStart && bookPlannedEnd
+      ? findConflict(bookingModal.id, bookStart, bookPlannedEnd)
+      : null;
+  // The next already-booked window starting after this one begins caps how
+  // long this booking can run — pulled straight from the slot's real
+  // availability data, not a hardcoded ceiling.
+  const nextBookedWindow =
+    bookingModal && bookStart
+      ? (slotAvailability[bookingModal.id] || [])
+          .filter((w) => new Date(w.startTime) > bookStart)
+          .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))[0]
+      : null;
+  const availableMinutes = nextBookedWindow
+    ? Math.floor((new Date(nextBookedWindow.startTime) - bookStart) / 60000)
+    : null;
+  const exceedsAvailableTime =
+    availableMinutes != null && bookDurationMinutes > availableMinutes;
+
+  const formatDuration = (mins) => {
+    const m = parseInt(mins);
+    if (!m || m <= 0) return '';
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    if (h && rem) return `${h}h ${rem}m`;
+    if (h) return `${h}h`;
+    return `${rem}m`;
   };
 
   return (
@@ -631,15 +713,22 @@ export default function StationDetail() {
         )}
       </div>
 
-      {reviews.length === 0 ? (
-        <div className="ev-card" style={{ padding: 28, textAlign: 'center' }}>
-          <p style={{ color: 'var(--text-muted)', margin: 0 }}>
-            No reviews yet — the first review comes from the first driver to complete and pay for a
-            session here.
-          </p>
-        </div>
-      ) : (
+      {reviewsLoading && !reviews.length ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="ev-card" style={{ padding: 20 }}>
+              <SkeletonRow />
+            </div>
+          ))}
+        </div>
+      ) : reviews.length === 0 ? (
+        <EmptyState
+          title="No Records Found"
+          subtitle="No reviews yet — the first review comes from the first driver to complete and pay for a session here."
+        />
+      ) : (
+        <>
+        <div className="list-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {reviews.map((r, i) => (
             <motion.article
               key={r.id}
@@ -726,6 +815,15 @@ export default function StationDetail() {
             </motion.article>
           ))}
         </div>
+        <Pagination
+          page={reviewsPage}
+          totalPages={reviewsPagination?.pages}
+          onChange={setReviewsPage}
+          variant="standalone"
+          total={reviewsPagination?.total}
+          limit={10}
+        />
+        </>
       )}
 
       {/* Review Modal */}
@@ -824,26 +922,26 @@ export default function StationDetail() {
           </div>
           <div className="mb-4">
             <label className="form-label" htmlFor="book-duration">
-              Duration
+              Duration (minutes)
             </label>
-            <select
+            <input
               id="book-duration"
-              className="form-select"
+              type="number"
+              className="form-control"
+              placeholder="e.g. 80 for 1h 20m"
+              step="5"
+              min="15"
+              max={availableMinutes ?? 1440}
               value={bookForm.durationMinutes}
-              onChange={(e) =>
-                setBookForm({ ...bookForm, durationMinutes: parseInt(e.target.value) })
-              }
-            >
-              <option value={30}>30 minutes</option>
-              <option value={60}>1 hour</option>
-              <option value={90}>1.5 hours</option>
-              <option value={120}>2 hours</option>
-              <option value={180}>3 hours</option>
-              <option value={240}>4 hours</option>
-            </select>
+              onChange={(e) => setBookForm({ ...bookForm, durationMinutes: e.target.value })}
+              required
+            />
             <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Minimum 15 minutes{bookDurationMinutes > 0 && ` (${formatDuration(bookDurationMinutes)})`}.
               The slot is reserved for this window; others can book around it. Final cost is based
               on actual charging time.
+              {availableMinutes != null &&
+                ` Only ${availableMinutes} minute${availableMinutes === 1 ? '' : 's'} available before the next booking.`}
             </small>
           </div>
           <div
@@ -890,31 +988,50 @@ export default function StationDetail() {
             >
               Estimated cost:{' '}
               <strong style={{ color: 'var(--primary-dark)' }}>
-                {toPKR(
-                  (bookingModal?.powerKw || 0) * (bookForm.durationMinutes / 60) * s.pricePerKwh
-                )}
+                {toPKR((bookingModal?.powerKw || 0) * (bookDurationMinutes / 60) * s.pricePerKwh)}
               </strong>
               <span style={{ fontSize: '0.72rem' }}>
-                ({bookForm.durationMinutes} min @ {bookingModal?.powerKw} kW)
+                ({bookDurationMinutes} min @ {bookingModal?.powerKw} kW)
               </span>
             </p>
-          </div>
-          {(() => {
-            if (!bookingModal || !bookForm.startTime) return null;
-            const start = new Date(bookForm.startTime);
-            const plannedEnd = new Date(start.getTime() + bookForm.durationMinutes * 60 * 1000);
-            const conflict = findConflict(bookingModal.id, start, plannedEnd);
-            if (!conflict) return null;
-            const until = conflict.plannedEndTime
-              ? ` until ${new Date(conflict.plannedEndTime).toLocaleString()}`
-              : ' (open-ended)';
-            return (
-              <p style={{ color: 'var(--danger)', fontSize: '0.82rem', marginBottom: 16 }}>
-                This slot is already booked from {new Date(conflict.startTime).toLocaleString()}
-                {until} — pick a different time or duration.
+            {bookPlannedEnd && (
+              <p
+                style={{
+                  color: 'var(--text-muted)',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginTop: 4,
+                }}
+              >
+                Ends at:{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>
+                  {bookPlannedEnd.toLocaleString()}
+                </strong>
               </p>
-            );
-          })()}
+            )}
+          </div>
+          {bookConflict &&
+            (() => {
+              const until = bookConflict.plannedEndTime
+                ? ` until ${new Date(bookConflict.plannedEndTime).toLocaleString()}`
+                : ' (open-ended)';
+              return (
+                <p style={{ color: 'var(--danger)', fontSize: '0.82rem', marginBottom: 16 }}>
+                  This slot is already booked from {new Date(bookConflict.startTime).toLocaleString()}
+                  {until} — pick a different time or duration.
+                </p>
+              );
+            })()}
+          {!bookConflict && exceedsAvailableTime && (
+            <p style={{ color: 'var(--danger)', fontSize: '0.82rem', marginBottom: 16 }}>
+              Requested duration ({formatDuration(bookDurationMinutes)}) exceeds the available time
+              for this slot — only {availableMinutes} minute{availableMinutes === 1 ? '' : 's'} free
+              before the next booking at {new Date(nextBookedWindow.startTime).toLocaleString()}.
+              Reduce the duration or pick a different time.
+            </p>
+          )}
           <button
             type="submit"
             className="btn-gold"
@@ -928,15 +1045,9 @@ export default function StationDetail() {
             }}
             disabled={
               evs.length === 0 ||
-              (bookingModal &&
-                bookForm.startTime &&
-                !!findConflict(
-                  bookingModal.id,
-                  new Date(bookForm.startTime),
-                  new Date(
-                    new Date(bookForm.startTime).getTime() + bookForm.durationMinutes * 60000
-                  )
-                ))
+              bookDurationMinutes < 15 ||
+              !!bookConflict ||
+              exceedsAvailableTime
             }
           >
             Confirm Booking <CheckCircle2 size={16} />
@@ -957,6 +1068,16 @@ export default function StationDetail() {
               60% bid amount + 40% battery urgency
             </strong>
             . Lower battery = higher priority.
+            {bidModal?.auctionReservationMinutes && (
+              <>
+                {' '}
+                If you win, you&apos;ll have{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>
+                  {bidModal.auctionReservationMinutes} minutes
+                </strong>{' '}
+                to check in before the slot is offered to the next bidder.
+              </>
+            )}
           </p>
           {/* Leaderboard */}
           {slotBids.length > 0 && (
@@ -1004,18 +1125,17 @@ export default function StationDetail() {
               id="bid-amount"
               type="number"
               className="form-control"
-              placeholder="e.g. 500"
+              placeholder={`Minimum ${minRequiredBid}`}
               step="0.01"
-              min="0.01"
+              min={minRequiredBid}
               value={bidForm.amount}
               onChange={(e) => setBidForm({ ...bidForm, amount: e.target.value })}
               required
             />
-            {bidForm.amount > 0 && (
-              <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                ≈ {toPKR(bidForm.amount)}
-              </small>
-            )}
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              Minimum bid: {toPKR(minRequiredBid)}
+              {bidForm.amount > 0 && <> · ≈ {toPKR(bidForm.amount)}</>}
+            </small>
           </div>
           <div className="mb-4">
             <label className="form-label" htmlFor="bid-battery">

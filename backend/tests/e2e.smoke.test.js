@@ -28,10 +28,13 @@ process.env.JWT_EXPIRES_IN = '1h';
 process.env.ADMIN_SETUP_KEY = 'e2e-setup-key';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_e2e_test_secret';
 process.env.NODE_ENV = 'test';
-// Leave SENDGRID_API_KEY unset so sendEmail() takes its no-key short-circuit
-// (logs a warning, resolves immediately) instead of making a real HTTPS call
-// to SendGrid during tests.
-delete process.env.SENDGRID_API_KEY;
+// Leave SMTP unset so sendEmail() takes its no-config short-circuit instead
+// of making a real network call during tests.
+delete process.env.SMTP_HOST;
+delete process.env.SMTP_PORT;
+delete process.env.SMTP_USER;
+delete process.env.SMTP_PASS;
+delete process.env.EMAIL_FROM;
 
 const { createInMemoryPrisma } = await import('./helpers/inMemoryPrisma.js');
 const mockPrisma = createInMemoryPrisma();
@@ -42,6 +45,11 @@ const { default: app } = await import('../app.js');
 
 const api = () => request(app);
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
+
+// stripe.refunds.create is a real network call (unlike webhooks.constructEvent,
+// which verifies purely locally) — mocked so the emergency-stop refund path
+// can be exercised without a live key, same "no network" guarantee as above.
+const refundSpy = jest.spyOn(stripe.refunds, 'create').mockResolvedValue({ id: 're_test_1' });
 
 // Builds a validly-signed fake Stripe webhook request body + signature for
 // a payment_intent.succeeded event, entirely locally (no network call).
@@ -225,6 +233,98 @@ describe('E2E: station lifecycle (owner creates → admin approves)', () => {
     expect(res.body.data.status).toBe('APPROVED');
   });
 
+  it('after approval, an address/price change is queued for admin review instead of applying instantly', async () => {
+    const res = await api()
+      .put('/api/stations/owner/mine')
+      .set(auth(ownerToken))
+      .send({
+        name: 'GreenVolt Gulberg',
+        address: '99 New Blvd',
+        city: 'Lahore',
+        latitude: 31.6,
+        longitude: 74.4,
+        pricePerKwh: 0.25,
+        amenities: [],
+        images: [],
+      });
+    expect(res.status).toBe(200);
+    // The live station is untouched — still the original address/price.
+    expect(res.body.data.address).toBe('12 Main Blvd');
+    expect(res.body.data.pricePerKwh).toBeCloseTo(0.18, 2);
+    expect(res.body.pendingRequest).toBeTruthy();
+    expect(res.body.pendingRequest.status).toBe('PENDING');
+    expect(res.body.pendingRequest.address).toBe('99 New Blvd');
+    expect(res.body.pendingRequest.pricePerKwh).toBeCloseTo(0.25, 2);
+  });
+
+  it('the owner sees the pending request on their own station', async () => {
+    const res = await api().get('/api/stations/owner/mine').set(auth(ownerToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.updateRequests).toHaveLength(1);
+    expect(res.body.data.updateRequests[0].status).toBe('PENDING');
+  });
+
+  it('a non-owner cannot review station update requests', async () => {
+    const res = await api().get('/api/admin/station-requests').set(auth(ownerToken));
+    expect(res.status).toBe(403);
+  });
+
+  it('admin sees and approves the pending request, which then applies to the live station', async () => {
+    const list = await api().get('/api/admin/station-requests').set(auth(adminToken));
+    expect(list.status).toBe(200);
+    expect(list.body.data).toHaveLength(1);
+    const requestId = list.body.data[0].id;
+    expect(list.body.data[0].station.name).toBe('GreenVolt Gulberg');
+
+    const approve = await api()
+      .patch(`/api/admin/station-requests/${requestId}`)
+      .set(auth(adminToken))
+      .send({ action: 'APPROVED' });
+    expect(approve.status).toBe(200);
+
+    const station = await mockPrisma.chargingStation.findUnique({ where: { id: stationId } });
+    expect(station.address).toBe('99 New Blvd');
+    expect(station.pricePerKwh).toBeCloseTo(0.25, 2);
+
+    // Already-reviewed requests can't be reviewed again.
+    const again = await api()
+      .patch(`/api/admin/station-requests/${requestId}`)
+      .set(auth(adminToken))
+      .send({ action: 'REJECTED' });
+    expect(again.status).toBe(409);
+
+    // Restore the original address/price — later tests in this file
+    // (check-in cost, payment amount) are pinned to the original
+    // 0.18/kWh rate, so this scenario can't leave it changed.
+    const revert = await api()
+      .put('/api/stations/owner/mine')
+      .set(auth(ownerToken))
+      .send({ address: '12 Main Blvd', city: 'Lahore', latitude: 31.5204, longitude: 74.3587, pricePerKwh: 0.18 });
+    expect(revert.body.pendingRequest).toBeTruthy();
+    const revertId = revert.body.pendingRequest.id;
+    const revertApprove = await api()
+      .patch(`/api/admin/station-requests/${revertId}`)
+      .set(auth(adminToken))
+      .send({ action: 'APPROVED' });
+    expect(revertApprove.status).toBe(200);
+    const restored = await mockPrisma.chargingStation.findUnique({ where: { id: stationId } });
+    expect(restored.address).toBe('12 Main Blvd');
+    expect(restored.pricePerKwh).toBeCloseTo(0.18, 2);
+  });
+
+  it('amenities changes still apply directly, with no approval needed', async () => {
+    // Deliberately doesn't touch name/address/price — this only proves the
+    // still-directly-editable fields aren't gated, without disturbing the
+    // station name/address later tests in this file assert against.
+    const res = await api()
+      .put('/api/stations/owner/mine')
+      .set(auth(ownerToken))
+      .send({ amenities: ['WiFi'], images: [] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.amenities).toEqual(['WiFi']);
+    expect(res.body.pendingRequest).toBeNull();
+  });
+
   it('owner adds two slots after approval', async () => {
     const s1 = await api()
       .post('/api/slots')
@@ -381,11 +481,105 @@ describe('E2E: check-in locks cost, webhook pays exactly once, then completion',
     expect(res.status).toBe(403);
   });
 
-  it('the station owner completes it; totalCost is the locked-in figure, not recomputed', async () => {
-    const res = await api().patch(`/api/bookings/${booking1Id}/complete`).set(auth(ownerToken));
+  it('only the owner can read their real live charging sessions', async () => {
+    const forbidden = await api().get('/api/stations/owner/live-sessions').set(auth(evToken));
+    expect(forbidden.status).toBe(403);
+
+    const res = await api().get('/api/stations/owner/live-sessions').set(auth(ownerToken));
     expect(res.status).toBe(200);
-    expect(res.body.data.totalCost).toBeCloseTo(3.96, 1);
-    expect(res.body.data.overageAmount).toBeNull();
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].bookingId).toBe(booking1Id);
+    expect(res.body.data[0].customer.name).toBe('Eva Driver');
+    expect(res.body.data[0].slot.slotNumber).toBe(1);
+    expect(res.body.data[0].sessionStatus).toBe('ACTIVE');
+  });
+
+  it('emergency stop requires a reason and rejects non-owners', async () => {
+    const missingReason = await api()
+      .patch(`/api/bookings/${booking1Id}/emergency-stop`)
+      .set(auth(ownerToken))
+      .send({ reason: ' ' });
+    expect(missingReason.status).toBe(400);
+
+    const wrongRole = await api()
+      .patch(`/api/bookings/${booking1Id}/emergency-stop`)
+      .set(auth(evToken))
+      .send({ reason: 'Driver attempted stop' });
+    expect(wrongRole.status).toBe(403);
+  });
+
+  it('the station owner emergency-stops it and final session data is persisted', async () => {
+    const res = await api()
+      .patch(`/api/bookings/${booking1Id}/emergency-stop`)
+      .set(auth(ownerToken))
+      .send({ reason: 'Connector temperature exceeded safe limit' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('COMPLETED');
+    expect(res.body.data.finalEnergyKwh).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.finalBill).toBeGreaterThanOrEqual(0);
+
+    const booking = await mockPrisma.booking.findUnique({ where: { id: booking1Id } });
+    expect(booking.endTime).toBeTruthy();
+    expect(booking.durationMinutes).toBeGreaterThanOrEqual(0);
+    expect(booking.stopReason).toBe('Connector temperature exceeded safe limit');
+    expect(booking.ratePerKwh).toBeCloseTo(0.18, 2);
+    expect(booking.emergencyStoppedBy).toBeTruthy();
+    expect(booking.emergencyStoppedAt).toBeTruthy();
+
+    const slot = await mockPrisma.slot.findUnique({ where: { id: slot1Id } });
+    expect(slot.status).toBe('AVAILABLE');
+
+    // Charged Rs. 3.96 upfront for the full 1h window, stopped almost
+    // immediately — nearly the whole amount is owed back as a refund.
+    expect(res.body.data.refundAmount).toBeGreaterThan(0);
+    expect(refundSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_intent: 'pi_test_1' })
+    );
+    const payment = await mockPrisma.payment.findUnique({ where: { bookingId: booking1Id } });
+    expect(['REFUNDED', 'PARTIALLY_REFUNDED']).toContain(payment.status);
+    expect(payment.refundedAmount).toBeCloseTo(res.body.data.refundAmount, 2);
+  });
+
+  it('only the station owner can load complete emergency-stop booking details', async () => {
+    const forbidden = await api()
+      .get(`/api/stations/owner/bookings/${booking1Id}`)
+      .set(auth(evToken));
+    expect(forbidden.status).toBe(403);
+
+    const res = await api()
+      .get(`/api/stations/owner/bookings/${booking1Id}`)
+      .set(auth(ownerToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe(booking1Id);
+    expect(res.body.data.sessionStatus).toBe('EMERGENCY_STOPPED');
+    expect(res.body.data.emergencyReason).toBe(
+      'Connector temperature exceeded safe limit'
+    );
+    expect(res.body.data.emergencyStoppedByName).toBe('Omar Owner');
+    expect(res.body.data.energyDeliveredKwh).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.sessionDurationMinutes).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.totalAmount).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns a filterable station-owner report with database-backed totals', async () => {
+    const forbidden = await api().get('/api/stations/owner/reports').set(auth(evToken));
+    expect(forbidden.status).toBe(403);
+
+    const res = await api()
+      .get('/api/stations/owner/reports')
+      .query({ sessionStatus: 'EMERGENCY_STOPPED', search: 'Eva Driver' })
+      .set(auth(ownerToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.rows).toHaveLength(1);
+    expect(res.body.data.rows[0].id).toBe(booking1Id);
+    expect(res.body.data.rows[0].sessionStatus).toBe('EMERGENCY_STOPPED');
+    expect(res.body.data.rows[0].refundAmount).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.rows[0].finalChargedAmount).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.summary.totalSessions).toBe(1);
+    expect(res.body.data.summary.emergencyStoppedSessions).toBe(1);
+    expect(res.body.data.summary.totalRefundAmount).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.summary.totalEnergyDelivered).toBeGreaterThanOrEqual(0);
+    expect(res.body.data.slotNumbers).toContain(1);
   });
 
   it('payment history returns exactly one real Stripe-tagged payment with its station chain', async () => {
@@ -399,19 +593,34 @@ describe('E2E: check-in locks cost, webhook pays exactly once, then completion',
 });
 
 describe('E2E: auction flow', () => {
-  it('owner opens an auction on slot 2 (duration validated)', async () => {
+  it('owner opens an auction on slot 2 (duration, starting bid, reservation time validated)', async () => {
     const bad = await api()
       .post(`/api/slots/${slot2Id}/auction/open`)
       .set(auth(ownerToken))
-      .send({ durationMinutes: 99999 });
+      .send({ durationMinutes: 99999, startingBid: 500, reservationMinutes: 10 });
     expect(bad.status).toBe(400);
+
+    const noStartingBid = await api()
+      .post(`/api/slots/${slot2Id}/auction/open`)
+      .set(auth(ownerToken))
+      .send({ durationMinutes: 30, reservationMinutes: 10 });
+    expect(noStartingBid.status).toBe(400);
+
+    const noReservationTime = await api()
+      .post(`/api/slots/${slot2Id}/auction/open`)
+      .set(auth(ownerToken))
+      .send({ durationMinutes: 30, startingBid: 500 });
+    expect(noReservationTime.status).toBe(400);
 
     const res = await api()
       .post(`/api/slots/${slot2Id}/auction/open`)
       .set(auth(ownerToken))
-      .send({ durationMinutes: 30 });
+      .send({ durationMinutes: 30, startingBid: 500, minIncrement: 50, reservationMinutes: 10 });
     expect(res.status).toBe(200);
     expect(res.body.data.auctionOpen).toBe(true);
+    expect(res.body.data.auctionStartingBid).toBe(500);
+    expect(res.body.data.auctionMinIncrement).toBe(50);
+    expect(res.body.data.auctionReservationMinutes).toBe(10);
   });
 
   it('the owner CANNOT bid on their own slot (new guard)', async () => {
@@ -422,6 +631,14 @@ describe('E2E: auction flow', () => {
     expect(res.status).toBe(403);
   });
 
+  it('an EV user cannot bid below the station owner\'s starting bid price', async () => {
+    const res = await api()
+      .post('/api/bids')
+      .set(auth(evToken))
+      .send({ slotId: slot2Id, amount: 100, batteryLevel: 15 });
+    expect(res.status).toBe(400);
+  });
+
   it('an EV user bids; priority = 60% bid + 40% urgency against the fixed ceiling', async () => {
     const res = await api()
       .post('/api/bids')
@@ -430,6 +647,14 @@ describe('E2E: auction flow', () => {
     expect(res.status).toBe(201);
     // 1000/2000 × 0.6 + 1.0 × 0.4 = 0.7 → 70
     expect(res.body.data.bid.priority).toBeCloseTo(70, 5);
+  });
+
+  it('a second EV user cannot bid below the leading bid + minimum increment', async () => {
+    const res = await api()
+      .post('/api/bids')
+      .set(auth(ev2Token))
+      .send({ slotId: slot2Id, amount: 1010, batteryLevel: 50 });
+    expect(res.status).toBe(400);
   });
 
   it('closing the auction crowns the winner and auto-creates a CONFIRMED booking', async () => {
@@ -464,6 +689,14 @@ describe('E2E: auction flow', () => {
       .set(auth(ownerToken));
     expect(res.status).toBe(200);
     expect(res.body.data.totalCost).toBe(1000);
+
+    // Regression: durationMinutes/finalEnergyKwh used to only ever get
+    // persisted by the emergency-stop path — a normal completion left them
+    // null forever, so the owner's Session Details view always showed a
+    // blank dash for Duration/Energy Delivered even on a finished session.
+    const booking = await mockPrisma.booking.findUnique({ where: { id: auctionBookingId } });
+    expect(booking.durationMinutes).toBeGreaterThanOrEqual(0);
+    expect(booking.finalEnergyKwh).toBeGreaterThanOrEqual(0);
   });
 
   it('bids on the now-closed auction are rejected', async () => {

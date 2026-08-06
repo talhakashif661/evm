@@ -5,6 +5,7 @@ import { expireAllStaleBookings } from '../utils/bookingExpiry.js';
 import { getIO } from '../utils/socket.js';
 import { escapeRegex } from '../utils/regex.js';
 import { clearCacheByPrefix } from '../utils/simpleCache.js';
+import { paginationMeta } from '../utils/pagination.js';
 
 export const getDashboardStats = async (req, res, next) => {
   try {
@@ -50,12 +51,14 @@ export const getDashboardStats = async (req, res, next) => {
     // with no actual booking counts attached — the chart data was always
     // empty. Pull bookings created in that window and tally them per month.
     const rangeStart = new Date();
-    rangeStart.setMonth(rangeStart.getMonth() - 5);
     rangeStart.setDate(1);
+    rangeStart.setMonth(rangeStart.getMonth() - 5);
     rangeStart.setHours(0, 0, 0, 0);
 
     const last6Months = Array.from({ length: 6 }, (_, i) => {
       const d = new Date();
+      // Prevent end-of-month overflow (for example, July 31 -> June 31).
+      d.setDate(1);
       d.setMonth(d.getMonth() - i);
       return { month: d.toLocaleString('en', { month: 'short' }), year: d.getFullYear(), date: d };
     }).reverse();
@@ -102,8 +105,8 @@ export const getDashboardStats = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, role, search } = req.query;
-    const take = Math.min(parseInt(limit) || 20, 100);
+    const { page = 1, limit = 10, role, search } = req.query;
+    const take = Math.min(parseInt(limit) || 10, 100);
     const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
 
     const where = {
@@ -140,7 +143,7 @@ export const getAllUsers = async (req, res, next) => {
     res.json({
       success: true,
       data: users,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
+      pagination: paginationMeta(total, Math.max(parseInt(page) || 1, 1), take),
     });
   } catch (error) {
     next(error);
@@ -246,8 +249,8 @@ export const promoteToAdmin = async (req, res, next) => {
 
 export const getAllStations = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
-    const take = Math.min(parseInt(limit) || 20, 100);
+    const { page = 1, limit = 10, status } = req.query;
+    const take = Math.min(parseInt(limit) || 10, 100);
     const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
 
     const where = status ? { status } : {};
@@ -269,7 +272,7 @@ export const getAllStations = async (req, res, next) => {
     res.json({
       success: true,
       data: stations,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
+      pagination: paginationMeta(total, Math.max(parseInt(page) || 1, 1), take),
     });
   } catch (error) {
     next(error);
@@ -320,10 +323,117 @@ export const approveStation = async (req, res, next) => {
   }
 };
 
+// Address/city/coordinates/price changes on an already-APPROVED station are
+// queued here instead of applying instantly (see updateStation in
+// station.controller.js) — this lists what's awaiting review.
+export const getStationUpdateRequests = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    const take = Math.min(parseInt(limit) || 10, 100);
+    const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
+
+    const where = status ? { status } : {};
+
+    const [requests, total] = await Promise.all([
+      prisma.stationUpdateRequest.findMany({
+        where,
+        include: {
+          station: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              latitude: true,
+              longitude: true,
+              pricePerKwh: true,
+              owner: { select: { name: true, email: true } },
+            },
+          },
+        },
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.stationUpdateRequest.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: requests,
+      pagination: paginationMeta(total, Math.max(parseInt(page) || 1, 1), take),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reviewStationUpdateRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { action, adminNote } = req.body; // 'APPROVED' or 'REJECTED'
+
+    if (!['APPROVED', 'REJECTED'].includes(action)) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Action must be APPROVED or REJECTED' });
+    }
+
+    const request = await prisma.stationUpdateRequest.findUnique({
+      where: { id },
+      include: { station: { include: { owner: true } } },
+    });
+    if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
+    if (request.status !== 'PENDING') {
+      return res.status(409).json({ success: false, message: 'This request was already reviewed' });
+    }
+
+    if (action === 'APPROVED') {
+      const { address, city, latitude, longitude, pricePerKwh } = request;
+      await prisma.chargingStation.update({
+        where: { id: request.stationId },
+        data: {
+          ...(address != null && { address }),
+          ...(city != null && { city }),
+          ...(latitude != null && { latitude }),
+          ...(longitude != null && { longitude }),
+          ...(pricePerKwh != null && { pricePerKwh }),
+        },
+      });
+      clearCacheByPrefix('stations:list:');
+    }
+
+    await prisma.stationUpdateRequest.update({
+      where: { id },
+      data: { status: action, adminNote: adminNote || null, reviewedAt: new Date() },
+    });
+
+    const { name: stationName, owner } = request.station;
+    const { subject, html } =
+      action === 'APPROVED'
+        ? emailTemplates.stationUpdateApproved(owner.name, stationName)
+        : emailTemplates.stationUpdateRejected(owner.name, stationName, adminNote);
+    sendEmail({ to: owner.email, subject, html });
+    getIO()
+      ?.to(`user:${owner.id}`)
+      .emit('station:update-request-reviewed', { stationId: request.stationId, status: action });
+
+    audit(
+      req,
+      `STATION_UPDATE_REQUEST_${action}`,
+      `${action === 'APPROVED' ? 'Approved' : 'Rejected'} update request for station "${stationName}" (owner ${owner.email})`
+    );
+
+    res.json({ success: true, message: `Request ${action.toLowerCase()}` });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAllBookings = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
-    const take = Math.min(parseInt(limit) || 20, 100);
+    const { page = 1, limit = 10 } = req.query;
+    const take = Math.min(parseInt(limit) || 10, 100);
     const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
 
     await expireAllStaleBookings();
@@ -346,7 +456,7 @@ export const getAllBookings = async (req, res, next) => {
     res.json({
       success: true,
       data: bookings,
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
+      pagination: paginationMeta(total, Math.max(parseInt(page) || 1, 1), take),
     });
   } catch (error) {
     next(error);
@@ -358,8 +468,8 @@ export const getAllBookings = async (req, res, next) => {
 // second query instead of an include.
 export const getAuditLogs = async (req, res, next) => {
   try {
-    const { page = 1, limit = 25 } = req.query;
-    const take = Math.min(parseInt(limit) || 25, 100);
+    const { page = 1, limit = 10 } = req.query;
+    const take = Math.min(parseInt(limit) || 10, 100);
     const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
 
     const [logs, total] = await Promise.all([
@@ -379,7 +489,7 @@ export const getAuditLogs = async (req, res, next) => {
     res.json({
       success: true,
       data: logs.map((l) => ({ ...l, actor: l.userId ? actorById[l.userId] || null : null })),
-      pagination: { page: parseInt(page) || 1, limit: take, total, pages: Math.ceil(total / take) },
+      pagination: paginationMeta(total, Math.max(parseInt(page) || 1, 1), take),
     });
   } catch (error) {
     next(error);

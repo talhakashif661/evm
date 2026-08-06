@@ -93,7 +93,7 @@ export default function Register() {
     >
       <SEO
         title="Create an Account"
-        description="Create a free ChargeEV account to book EV charging stations, list your own charging station, or manage your EV fleet."
+        description="Create a free Unified EV account to book EV charging stations, list your own charging station, or manage your EV fleet."
         noIndex
       />
       <motion.div
@@ -130,7 +130,7 @@ export default function Register() {
           >
             Register <span style={{ color: 'var(--primary)' }}>As</span>
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Join ChargeEV</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>Join Unified EV</p>
         </div>
 
         <div className="ev-card" style={{ padding: 32 }}>

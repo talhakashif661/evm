@@ -22,7 +22,7 @@ export default function NotFound() {
     >
       <SEO
         title="Page Not Found"
-        description="The page you're looking for doesn't exist or may have been moved. Return to ChargeEV to continue."
+        description="The page you're looking for doesn't exist or may have been moved. Return to Unified EV to continue."
         noIndex
       />
       <ZapOff size={56} color="var(--primary)" strokeWidth={1.5} />

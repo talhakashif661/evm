@@ -1,14 +1,16 @@
 import http from 'http';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import app from './app.js';
 import prisma from './utils/prisma.js';
 import { initSocket } from './utils/socket.js';
 import { getAllowedOrigins } from './utils/corsOrigins.js';
-import { expireNoShowBookings, expirePaymentTimeouts } from './utils/bookingExpiry.js';
-import { expireEndedAuctions } from './utils/auctionExpiry.js';
+import {
+  expireNoShowBookings,
+  expirePaymentTimeouts,
+  completeFinishedChargingSessions,
+} from './utils/bookingExpiry.js';
+import { expireEndedAuctions, expireAuctionReservations } from './utils/auctionExpiry.js';
 import logger from './utils/logger.js';
-
-dotenv.config();
 
 // Fail fast and loud on boot rather than crashing on the first request that
 // happens to touch a missing var (e.g. JWT_SECRET undefined would otherwise
@@ -35,7 +37,7 @@ const PORT = process.env.PORT || 5000;
 async function verifyDatabaseConnection() {
   if (process.env.NODE_ENV === 'test') return;
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$runCommandRaw({ ping: 1 });
     logger.info('Database connection verified');
   } catch (err) {
     logger.error(
@@ -64,18 +66,31 @@ initSocket(httpServer, getAllowedOrigins());
 // deliberate deviation from that convention, kept off during tests (which
 // import app.js directly and never start this timer anyway).
 let sweepInterval = null;
+let sweepInProgress = false;
 if (process.env.NODE_ENV !== 'test') {
-  sweepInterval = setInterval(() => {
-    expireNoShowBookings().catch((err) =>
-      logger.error('expireNoShowBookings failed:', err.message)
-    );
-    expirePaymentTimeouts().catch((err) =>
-      logger.error('expirePaymentTimeouts failed:', err.message)
-    );
+  sweepInterval = setInterval(async () => {
+    if (sweepInProgress) return;
+    sweepInProgress = true;
+    try {
+      await expireNoShowBookings();
+      await expirePaymentTimeouts();
+    // A charging session whose reserved window has ended stays ACTIVE
+    // forever otherwise — the slot never frees up and the live view keeps
+    // ticking past what the customer paid for until an owner notices and
+    // emergency-stops it. This closes it out automatically, on time.
+      await completeFinishedChargingSessions();
     // Auctions used to only ever close when the owner manually clicked
     // "Close Auction" — one whose deadline passed unattended stayed stuck
     // open forever. This resolves it the same way the manual close does.
-    expireEndedAuctions().catch((err) => logger.error('expireEndedAuctions failed:', err.message));
+      await expireEndedAuctions();
+    // Winning bidders who don't check in within their auction's configured
+    // Slot Reservation Time cascade to the next-ranked bidder here.
+      await expireAuctionReservations();
+    } catch (err) {
+      logger.error('Scheduled expiry sweep failed:', err.message);
+    } finally {
+      sweepInProgress = false;
+    }
   }, 30 * 1000);
 }
 

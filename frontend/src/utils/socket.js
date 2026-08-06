@@ -8,6 +8,28 @@ import { io } from 'socket.io-client';
 // and the Vite /socket.io proxy forwards it to the backend.
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const SOCKET_URL = API_BASE.replace(/\/api\/?$/, '') || undefined;
+const REALTIME_ENABLED = import.meta.env.VITE_ENABLE_REALTIME !== 'false';
+
+// Vercel Functions cannot host a persistent Socket.IO server. This inert
+// client preserves the component contract when the backend is deployed there;
+// pages still refresh normally through their HTTP API calls.
+const disabledSocket = {
+  on() {
+    return this;
+  },
+  off() {
+    return this;
+  },
+  emit() {
+    return this;
+  },
+  connect() {
+    return this;
+  },
+  disconnect() {
+    return this;
+  },
+};
 
 let socket = null;
 
@@ -17,6 +39,7 @@ let socket = null;
 // verify it and auto-join this user's own notification room itself — see
 // backend/utils/socket.js.
 export function getSocket() {
+  if (!REALTIME_ENABLED) return disabledSocket;
   if (!socket) {
     socket = io(SOCKET_URL, {
       autoConnect: true,
@@ -33,6 +56,7 @@ export function getSocket() {
 // silently staying authenticated as whoever was logged in when it was first
 // opened (or staying anonymous after a login that happened with no refresh).
 export function reauthSocket() {
+  if (!REALTIME_ENABLED) return;
   if (!socket) return;
   socket.auth = { token: localStorage.getItem('ev_token') || undefined };
   socket.disconnect();

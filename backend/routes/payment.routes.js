@@ -5,6 +5,7 @@ import stripe from '../utils/stripe.js';
 import { activateBookingPayment } from '../utils/paymentActivation.js';
 import { getIO } from '../utils/socket.js';
 import logger from '../utils/logger.js';
+import { parsePagination, paginationMeta } from '../utils/pagination.js';
 
 // Mounted separately in app.js, BEFORE the global express.json() parser —
 // Stripe's signature check needs the exact raw request bytes, which are gone
@@ -76,16 +77,24 @@ router.use(authenticate);
 
 router.get('/history', async (req, res, next) => {
   try {
-    const payments = await prisma.payment.findMany({
-      where: { userId: req.user.id },
-      include: {
-        booking: {
-          include: { slot: { include: { station: { select: { name: true } } } } },
+    const { page, limit, skip } = parsePagination(req.query);
+    const where = { userId: req.user.id };
+
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        include: {
+          booking: {
+            include: { slot: { include: { station: { select: { name: true } } } } },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json({ success: true, data: payments });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.payment.count({ where }),
+    ]);
+    res.json({ success: true, data: payments, pagination: paginationMeta(total, page, limit) });
   } catch (e) {
     next(e);
   }

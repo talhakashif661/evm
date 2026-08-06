@@ -1,4 +1,5 @@
 import express from 'express';
+import { getOwnerLiveSessions } from '../controllers/chargingSession.controller.js';
 import {
   createStation,
   getMyStation,
@@ -6,6 +7,8 @@ import {
   getAllStations,
   getStationById,
   getStationBookings,
+  getStationBookingDetails,
+  getStationReport,
   getStationRevenue,
 } from '../controllers/station.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
@@ -22,7 +25,15 @@ const router = express.Router();
 router.get('/owner/mine', authenticate, authorize('STATION_OWNER'), getMyStation);
 router.put('/owner/mine', authenticate, authorize('STATION_OWNER'), updateStation);
 router.get('/owner/bookings', authenticate, authorize('STATION_OWNER'), getStationBookings);
+router.get(
+  '/owner/bookings/:bookingId',
+  authenticate,
+  authorize('STATION_OWNER'),
+  getStationBookingDetails
+);
 router.get('/owner/revenue', authenticate, authorize('STATION_OWNER'), getStationRevenue);
+router.get('/owner/reports', authenticate, authorize('STATION_OWNER'), getStationReport);
+router.get('/owner/live-sessions', authenticate, authorize('STATION_OWNER'), getOwnerLiveSessions);
 
 // Public routes
 router.get('/', getAllStations);

@@ -26,7 +26,7 @@ export function initErrorTracking() {
 
 export const logger = {
   error: (...args) => {
-    if (isDev) console.error('[ChargeEV]', ...args);
+    if (isDev) console.error('[Unified EV]', ...args);
     if (sentryEnabled) {
       const err = args.find((a) => a instanceof Error);
       if (err) Sentry.captureException(err);
@@ -34,10 +34,10 @@ export const logger = {
     }
   },
   warn: (...args) => {
-    if (isDev) console.warn('[ChargeEV]', ...args);
+    if (isDev) console.warn('[Unified EV]', ...args);
   },
   info: (...args) => {
-    if (isDev) console.info('[ChargeEV]', ...args);
+    if (isDev) console.info('[Unified EV]', ...args);
   },
 };
 

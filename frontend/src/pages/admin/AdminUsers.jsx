@@ -7,26 +7,35 @@ import {
   deleteUser,
   promoteToAdmin,
 } from '../../store/slices/adminUsersSlice';
-import { SkeletonRow } from '../../components/Skeleton';
+import { SkeletonTableRows } from '../../components/Skeleton';
+import { EmptyState } from '../../components/Spinner';
+import Pagination from '../../components/Pagination.jsx';
 import SEO from '../../components/SEO';
 
 const roleBadge = (r) =>
   r === 'ADMIN' ? 'badge-danger' : r === 'STATION_OWNER' ? 'badge-warning' : 'badge-primary';
 
+const ROLE_FILTERS = [
+  { label: 'All Users', value: '' },
+  { label: 'EV Users', value: 'EV_USER' },
+  { label: 'Station Owners', value: 'STATION_OWNER' },
+];
+
 export default function AdminUsers() {
   const dispatch = useDispatch();
   const { users, loading, pagination } = useSelector((s) => s.adminUsers);
   const [page, setPage] = useState(1);
+  const [roleFilter, setRoleFilter] = useState('');
 
   useEffect(() => {
-    dispatch(fetchUsers({ page, limit: 20 }));
-  }, [dispatch, page]);
+    dispatch(fetchUsers({ page, limit: 10, ...(roleFilter && { role: roleFilter }) }));
+  }, [dispatch, page, roleFilter]);
 
   return (
     <div className="page-container">
       <SEO
         title="Manage Users"
-        description="View all registered users, promote admins, and manage accounts across the ChargeEV platform."
+        description="View all registered users, promote admins, and manage accounts across the Unified EV platform."
         noIndex
       />
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -43,31 +52,58 @@ export default function AdminUsers() {
           </h1>
         </div>
 
-        {loading ? (
-          <div className="ev-card" style={{ padding: '8px 20px' }}>
-            {[...Array(6)].map((_, i) => (
-              <SkeletonRow key={i} />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="ev-card" style={{ overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="ev-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Verified</th>
-                      <th>Blocked</th>
-                      <th>Joined</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(users || []).map((u, i) => (
+        {/* Role filter */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
+          {ROLE_FILTERS.map(({ label, value }) => (
+            <button
+              key={value}
+              onClick={() => {
+                setRoleFilter(value);
+                setPage(1);
+              }}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                background: roleFilter === value ? 'var(--gold)' : 'var(--bg-card)',
+                border: `1px solid ${roleFilter === value ? 'var(--gold)' : 'var(--border)'}`,
+                color: roleFilter === value ? 'var(--on-dark)' : 'var(--text-secondary)',
+                transition: 'background-color 0.12s ease, border-color 0.12s ease',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="ev-card" style={{ overflow: 'hidden' }}>
+          <div className="table-scroll">
+            <table className="ev-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Verified</th>
+                  <th>Blocked</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <SkeletonTableRows rows={6} columns={8} />
+                ) : !users || users.length === 0 ? (
+                  <tr>
+                    <td colSpan={8}>
+                      <EmptyState title="No Records Found" subtitle="No users to show yet." />
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u, i) => (
                       <tr key={u.id}>
                         <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>
                         <td style={{ fontWeight: 500 }}>{u.name}</td>
@@ -141,43 +177,21 @@ export default function AdminUsers() {
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            {pagination && pagination.pages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
-                <button
-                  className="btn-outline"
-                  style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Previous
-                </button>
-                <span
-                  style={{
-                    alignSelf: 'center',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  Page {pagination.page} of {pagination.pages}
-                </span>
-                <button
-                  className="btn-outline"
-                  style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-                  disabled={page >= pagination.pages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
+        <Pagination
+          page={page}
+          totalPages={pagination?.pages}
+          onChange={setPage}
+          variant="standalone"
+          total={pagination?.total}
+          limit={10}
+        />
       </motion.div>
     </div>
   );

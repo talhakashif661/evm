@@ -52,7 +52,7 @@ export default function ResetPassword() {
     >
       <SEO
         title="Reset Password"
-        description="Set a new password for your ChargeEV account."
+        description="Set a new password for your Unified EV account."
         noIndex
       />
       <motion.div

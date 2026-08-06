@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { audit } from '../utils/audit.js';
+import { parsePagination, paginationMeta } from '../utils/pagination.js';
 
 // Shared helper: average + count for a set of stations, computed in one query.
 // Used here and by station.controller to decorate cards/detail pages.
@@ -87,15 +88,18 @@ export const upsertReview = async (req, res, next) => {
 export const getStationReviews = async (req, res, next) => {
   try {
     const { stationId } = req.params;
-    const take = Math.min(parseInt(req.query.limit) || 20, 50);
+    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 50 });
+    const where = { stationId };
 
-    const [reviews, stats] = await Promise.all([
+    const [reviews, total, stats] = await Promise.all([
       prisma.review.findMany({
-        where: { stationId },
+        where,
         orderBy: { createdAt: 'desc' },
-        take,
+        skip,
+        take: limit,
         include: { user: { select: { id: true, name: true, avatar: true } } },
       }),
+      prisma.review.count({ where }),
       ratingStatsFor([stationId]),
     ]);
 
@@ -103,7 +107,22 @@ export const getStationReviews = async (req, res, next) => {
       success: true,
       data: reviews,
       stats: stats[stationId] || { ratingAvg: 0, ratingCount: 0 },
+      pagination: paginationMeta(total, page, limit),
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/reviews/station/:stationId/mine — the logged-in user's own review
+// for this station, if any. Independent of the (paginated) list above so the
+// review form can tell "edit" from "write" regardless of which page is shown.
+export const getMyReviewForStation = async (req, res, next) => {
+  try {
+    const review = await prisma.review.findFirst({
+      where: { stationId: req.params.stationId, userId: req.user.id },
+    });
+    res.json({ success: true, data: review });
   } catch (error) {
     next(error);
   }

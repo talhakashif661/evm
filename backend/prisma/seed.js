@@ -111,6 +111,9 @@ async function main() {
       status: 'AVAILABLE',
       auctionOpen: true,
       auctionEnd: new Date(Date.now() + 3600000),
+      auctionStartingBid: 500,
+      auctionMinIncrement: 50,
+      auctionReservationMinutes: 10,
     },
   ];
 

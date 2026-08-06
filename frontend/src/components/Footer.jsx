@@ -7,6 +7,23 @@ export default function Footer() {
 
   return (
     <footer className="site-footer">
+      <div className="footer-cta-wrap">
+        <div className="footer-cta">
+          <div>
+            <span className="footer-cta-kicker">Charge with confidence</span>
+            <h2>Ready for a simpler EV journey?</h2>
+            <p>Find an available charger, reserve your slot, and get moving.</p>
+          </div>
+          <div className="footer-cta-actions">
+            <Link to="/contact" className="footer-cta-secondary">
+              Talk to support
+            </Link>
+            <Link to="/stations" className="footer-cta-button">
+              Explore charging stations <Zap size={17} />
+            </Link>
+          </div>
+        </div>
+      </div>
       <div className="page-container" style={{ padding: '48px 24px 24px' }}>
         <div className="row g-4">
           <div className="col-12 col-md-4">
@@ -32,7 +49,7 @@ export default function Footer() {
                   fontSize: '1.15rem',
                 }}
               >
-                Charge<span style={{ color: 'var(--primary)' }}>EV</span>
+                Unified <span style={{ color: 'var(--primary)' }}>EV</span>
               </span>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', maxWidth: 280 }}>
@@ -40,7 +57,7 @@ export default function Footer() {
             </p>
             <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
               <a
-                href={waLink(CONTACT.phone, 'Hi! Reaching out from the ChargeEV site.')}
+                href={waLink(CONTACT.phone, 'Hi! Reaching out from the Unified EV site.')}
                 target="_blank"
                 rel="noreferrer"
                 className="footer-social"
@@ -152,7 +169,7 @@ export default function Footer() {
         <div className="glow-line" style={{ margin: '32px 0 20px' }} />
 
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-          © {year} ChargeEV. All rights reserved. · Developed by {CONTACT.name} — Punjab University
+          © {year} Unified EV. All rights reserved. · Developed by {CONTACT.name} — Punjab University
         </p>
       </div>
     </footer>

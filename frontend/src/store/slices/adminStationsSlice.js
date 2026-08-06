@@ -27,9 +27,40 @@ export const updateStationStatus = createAsyncThunk(
   }
 );
 
+export const fetchStationUpdateRequests = createAsyncThunk(
+  'stations/fetchUpdateRequests',
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const query = new URLSearchParams({ status: 'PENDING', ...params }).toString();
+      const res = await api.get(`/admin/station-requests?${query}`);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
+  }
+);
+
+export const reviewStationUpdateRequest = createAsyncThunk(
+  'stations/reviewUpdateRequest',
+  async ({ id, action, adminNote }, { rejectWithValue }) => {
+    try {
+      const res = await api.patch(`/admin/station-requests/${id}`, { action, adminNote });
+      return { id, action, ...res.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message);
+    }
+  }
+);
+
 const stationsSlice = createSlice({
   name: 'stations',
-  initialState: { stations: [], pagination: null, loading: false },
+  initialState: {
+    stations: [],
+    pagination: null,
+    loading: false,
+    updateRequests: [],
+    updateRequestsLoading: false,
+  },
   reducers: {},
   extraReducers: (builder) => {
     builder
@@ -50,7 +81,23 @@ const stationsSlice = createSlice({
         if (idx !== -1) state.stations[idx].status = action.payload.status;
         toast.success(`Station ${action.payload.status.toLowerCase()}`);
       })
-      .addCase(updateStationStatus.rejected, (_, a) => toast.error(a.payload));
+      .addCase(updateStationStatus.rejected, (_, a) => toast.error(a.payload))
+      .addCase(fetchStationUpdateRequests.pending, (state) => {
+        state.updateRequestsLoading = true;
+      })
+      .addCase(fetchStationUpdateRequests.fulfilled, (state, action) => {
+        state.updateRequestsLoading = false;
+        state.updateRequests = action.payload.data;
+      })
+      .addCase(fetchStationUpdateRequests.rejected, (state, action) => {
+        state.updateRequestsLoading = false;
+        toast.error(action.payload || 'Failed to load pending requests');
+      })
+      .addCase(reviewStationUpdateRequest.fulfilled, (state, action) => {
+        state.updateRequests = state.updateRequests.filter((r) => r.id !== action.payload.id);
+        toast.success(`Request ${action.payload.action.toLowerCase()}`);
+      })
+      .addCase(reviewStationUpdateRequest.rejected, (_, a) => toast.error(a.payload));
   },
 });
 

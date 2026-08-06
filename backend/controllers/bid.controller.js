@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { getIO } from '../utils/socket.js';
+import { parsePagination, paginationMeta } from '../utils/pagination.js';
 
 /**
  * calculatePriority
@@ -50,6 +51,11 @@ export const placeBid = async (req, res, next) => {
       include: {
         bids: { where: { status: 'PENDING' } },
         station: { select: { ownerId: true } },
+        // The durable Auction round this bid belongs to (see the Auction
+        // model) — stamped onto the bid below so the owner's Auctions page
+        // can group bids by round even after the slot's own auction* fields
+        // get overwritten by a later round.
+        auctions: { where: { status: 'ACTIVE' }, orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
 
@@ -89,6 +95,29 @@ export const placeBid = async (req, res, next) => {
       where: { userId: req.user.id, slotId, status: 'PENDING' },
     });
 
+    // EV users never set the starting price — they can only meet or beat the
+    // station owner's configured minimum. Before there's a leading bid, that
+    // minimum is simply the starting price; once someone is leading, a new
+    // (or updated) bid must clear it by at least the optional increment. A
+    // bidder revising their own leading bid is compared against the
+    // next-highest OTHER bid, not their own current one.
+    const otherPendingBids = slot.bids.filter((b) => b.userId !== req.user.id);
+    const highestOtherBid = otherPendingBids.reduce(
+      (max, b) => (b.amount > max ? b.amount : max),
+      0
+    );
+    const startingBid = slot.auctionStartingBid ?? 0;
+    const minRequired = highestOtherBid
+      ? highestOtherBid + (slot.auctionMinIncrement ?? 0)
+      : startingBid;
+
+    if (parsedAmount < minRequired) {
+      return res.status(400).json({
+        success: false,
+        message: `Bid must be at least ${minRequired} (the required minimum bid for this auction)`,
+      });
+    }
+
     const priority = calculatePriority(parsedAmount, parsedBattery);
 
     if (existingBid) {
@@ -113,6 +142,7 @@ export const placeBid = async (req, res, next) => {
       data: {
         userId: req.user.id,
         slotId,
+        auctionId: slot.auctions[0]?.id,
         amount: parsedAmount,
         batteryLevel: parsedBattery,
         priority,
@@ -194,19 +224,28 @@ export const getSlotBids = async (req, res, next) => {
 
 export const getMyBids = async (req, res, next) => {
   try {
-    const bids = await prisma.bid.findMany({
-      where: { userId: req.user.id },
-      include: {
-        slot: {
-          include: {
-            station: { select: { name: true, address: true } },
+    const { page, limit, skip } = parsePagination(req.query);
+    const { status } = req.query;
+    const where = { userId: req.user.id, ...(status && { status }) };
+
+    const [bids, total] = await Promise.all([
+      prisma.bid.findMany({
+        where,
+        include: {
+          slot: {
+            include: {
+              station: { select: { name: true, address: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.bid.count({ where }),
+    ]);
 
-    res.json({ success: true, data: bids });
+    res.json({ success: true, data: bids, pagination: paginationMeta(total, page, limit) });
   } catch (error) {
     next(error);
   }
@@ -233,22 +272,30 @@ export const cancelBid = async (req, res, next) => {
 
 export const getAuctionResults = async (req, res, next) => {
   try {
-    const results = await prisma.bid.findMany({
-      where: {
-        userId: req.user.id,
-        status: { in: ['WON', 'LOST'] },
-      },
-      include: {
-        slot: {
-          include: {
-            station: { select: { name: true, address: true } },
+    const { page, limit, skip } = parsePagination(req.query);
+    const where = {
+      userId: req.user.id,
+      status: { in: ['WON', 'LOST', 'EXPIRED'] },
+    };
+
+    const [results, total] = await Promise.all([
+      prisma.bid.findMany({
+        where,
+        include: {
+          slot: {
+            include: {
+              station: { select: { name: true, address: true } },
+            },
           },
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.bid.count({ where }),
+    ]);
 
-    res.json({ success: true, data: results });
+    res.json({ success: true, data: results, pagination: paginationMeta(total, page, limit) });
   } catch (error) {
     next(error);
   }

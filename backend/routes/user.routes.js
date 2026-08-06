@@ -2,8 +2,11 @@ import express from 'express';
 import prisma from '../utils/prisma.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { isValidImageDataUrl } from '../utils/validateImageBytes.js';
+import { getUsageAnalytics } from '../controllers/analytics.controller.js';
 
 const router = express.Router();
+
+router.get('/usage-analytics', authenticate, getUsageAnalytics);
 
 // 50KB cap on the decoded avatar image keeps documents small and friendly
 // to MongoDB's free tier (M0) storage limits.

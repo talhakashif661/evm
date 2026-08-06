@@ -88,6 +88,8 @@ export function SlotStatusBadge({ status }) {
     OCCUPIED: { label: 'Occupied', cls: 'badge-danger' },
     RESERVED: { label: 'Reserved', cls: 'badge-warning' },
     MAINTENANCE: { label: 'Maintenance', cls: 'badge-info' },
+    OFFLINE: { label: 'Offline', cls: 'badge-info' },
+    FAULTED: { label: 'Faulted', cls: 'badge-danger' },
   };
   const s = map[status] || { label: status, cls: 'badge-info' };
   return <span className={s.cls}>{s.label}</span>;
@@ -99,8 +101,8 @@ export function BookingStatusBadge({ status }) {
     CONFIRMED: 'badge-info',
     CHECKED_IN: 'badge-warning',
     ACTIVE: 'badge-success',
-    COMPLETED: 'badge-gold',
-    CANCELLED: 'badge-danger',
+    COMPLETED: 'badge-success',
+    CANCELLED: 'badge-cancelled',
   };
   return <span className={map[status] || 'badge-info'}>{status.replace('_', ' ')}</span>;
 }

@@ -6,24 +6,45 @@ import { Zap, Target, Trophy, MapPin, Clock, ArrowRight, XCircle, BarChart3 } fr
 import { fetchMyBids, fetchAuctionResults, cancelBid } from '../store/slices/bidSlice';
 import { fetchStations } from '../store/slices/stationSlice';
 import { EmptyState, Countdown } from '../components/Spinner';
+import { SkeletonRow } from '../components/Skeleton';
 import { getSocket } from '../utils/socket';
 import { toPKR } from '../utils/pkr';
 import { playWinChime } from '../utils/winChime';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
+import Pagination from '../components/Pagination.jsx';
 
 export default function AuctionHub() {
   const dispatch = useDispatch();
-  const { bids, results } = useSelector((s) => s.bids);
+  const { bids, bidsPagination, bidsLoading, results, resultsPagination, resultsLoading } =
+    useSelector((s) => s.bids);
   const { stations } = useSelector((s) => s.stations);
   const { user } = useSelector((s) => s.auth);
   const [tab, setTab] = useState('live');
+  const [bidsPage, setBidsPage] = useState(1);
+  const [resultsPage, setResultsPage] = useState(1);
+
+  // A live update (auction closed/won/lost) means "my bids and results just
+  // changed" — jump back to page 1 (the freshest, since both are ordered
+  // newest-first) rather than trying to keep an arbitrary deeper page in sync.
+  const refreshBidsAndResults = () => {
+    setBidsPage(1);
+    setResultsPage(1);
+    dispatch(fetchMyBids({ status: 'PENDING', page: 1, limit: 10 }));
+    dispatch(fetchAuctionResults({ page: 1, limit: 10 }));
+  };
 
   useEffect(() => {
-    dispatch(fetchMyBids());
-    dispatch(fetchAuctionResults());
     dispatch(fetchStations({ limit: 50 }));
   }, [dispatch]);
+
+  useEffect(() => {
+    dispatch(fetchMyBids({ status: 'PENDING', page: bidsPage, limit: 10 }));
+  }, [dispatch, bidsPage]);
+
+  useEffect(() => {
+    dispatch(fetchAuctionResults({ page: resultsPage, limit: 10 }));
+  }, [dispatch, resultsPage]);
 
   // Live auction updates: join a socket room for every currently-open slot
   // so this page refreshes the moment someone else bids or an auction closes,
@@ -52,8 +73,7 @@ export default function AuctionHub() {
     const handleClosed = () => {
       toast.info('An auction you were watching has just closed.');
       refresh();
-      dispatch(fetchMyBids());
-      dispatch(fetchAuctionResults());
+      refreshBidsAndResults();
     };
 
     socket.on('bid:update', refresh);
@@ -66,6 +86,9 @@ export default function AuctionHub() {
       socket.off('auction:opened', refresh);
       socket.off('auction:closed', handleClosed);
     };
+    // refreshBidsAndResults intentionally omitted: it only calls dispatch
+    // with fixed args and stable setters, so it never goes stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, openSlotIdsKey]);
 
   // Targeted win/loss notification, in addition to the generic slot-room
@@ -94,13 +117,11 @@ export default function AuctionHub() {
         </span>,
         { autoClose: 12000 }
       );
-      dispatch(fetchMyBids());
-      dispatch(fetchAuctionResults());
+      refreshBidsAndResults();
     };
     const handleLost = ({ stationName }) => {
       toast.info(`Auction at ${stationName} closed — another bid was selected this time.`);
-      dispatch(fetchMyBids());
-      dispatch(fetchAuctionResults());
+      refreshBidsAndResults();
     };
 
     socket.on('auction:won', handleWon);
@@ -121,12 +142,14 @@ export default function AuctionHub() {
     () => stations.filter((s) => s.slots?.some((sl) => sl.auctionOpen)),
     [stations]
   );
-  const activeBids = bids.filter((b) => b.status === 'PENDING');
+  // Server-filtered to status=PENDING already (see the fetchMyBids effect
+  // above), so this is just the current page's pending bids.
+  const activeBids = bids;
 
   const tabs = [
     { id: 'live', label: 'Live Auctions', icon: Zap, count: auctionStations.length },
-    { id: 'mybids', label: 'My Bids', icon: Target, count: activeBids.length },
-    { id: 'results', label: 'Results', icon: Trophy, count: results.length },
+    { id: 'mybids', label: 'My Bids', icon: Target, count: bidsPagination?.total ?? activeBids.length },
+    { id: 'results', label: 'Results', icon: Trophy, count: resultsPagination?.total ?? results.length },
   ];
 
   return (
@@ -349,14 +372,23 @@ export default function AuctionHub() {
 
       {/* My Bids */}
       {tab === 'mybids' &&
-        (activeBids.length === 0 ? (
+        (bidsLoading && !activeBids.length ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="ev-card" style={{ padding: 20 }}>
+                <SkeletonRow />
+              </div>
+            ))}
+          </div>
+        ) : activeBids.length === 0 ? (
           <EmptyState
             icon={<Target size={48} color="var(--text-muted)" strokeWidth={1.5} />}
             title="No Active Bids"
             subtitle="Visit a station with an active auction to place a bid."
           />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <>
+          <div className="list-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {activeBids.map((bid, i) => (
               <motion.div
                 key={bid.id}
@@ -386,16 +418,8 @@ export default function AuctionHub() {
                     </p>
                   </div>
                   <button
+                    className="btn-cancel"
                     onClick={() => dispatch(cancelBid(bid.id))}
-                    style={{
-                      padding: '6px 14px',
-                      background: 'var(--danger-tint)',
-                      border: '1px solid var(--danger-tint-border)',
-                      borderRadius: 4,
-                      color: 'var(--danger)',
-                      cursor: 'pointer',
-                      fontSize: '0.82rem',
-                    }}
                   >
                     Cancel Bid
                   </button>
@@ -403,18 +427,36 @@ export default function AuctionHub() {
               </motion.div>
             ))}
           </div>
+          <Pagination
+            page={bidsPage}
+            totalPages={bidsPagination?.pages}
+            onChange={setBidsPage}
+            variant="standalone"
+            total={bidsPagination?.total}
+            limit={10}
+          />
+          </>
         ))}
 
       {/* Results */}
       {tab === 'results' &&
-        (results.length === 0 ? (
+        (resultsLoading && !results.length ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="ev-card" style={{ padding: 20 }}>
+                <SkeletonRow />
+              </div>
+            ))}
+          </div>
+        ) : results.length === 0 ? (
           <EmptyState
             icon={<BarChart3 size={48} color="var(--text-muted)" strokeWidth={1.5} />}
             title="No Auction Results Yet"
             subtitle="Results will appear here after auctions close."
           />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <>
+          <div className="list-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {results.map((bid, i) => (
               <motion.div
                 key={bid.id}
@@ -461,6 +503,15 @@ export default function AuctionHub() {
               </motion.div>
             ))}
           </div>
+          <Pagination
+            page={resultsPage}
+            totalPages={resultsPagination?.pages}
+            onChange={setResultsPage}
+            variant="standalone"
+            total={resultsPagination?.total}
+            limit={10}
+          />
+          </>
         ))}
     </div>
   );

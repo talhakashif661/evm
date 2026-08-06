@@ -32,6 +32,24 @@ export function SkeletonRow() {
   );
 }
 
+// <tbody> loading placeholder for history/list tables — `columns` bars per
+// row so the skeleton lines up with however many <th> the table has.
+export function SkeletonTableRows({ rows = 5, columns = 5 }) {
+  return (
+    <>
+      {Array.from({ length: rows }, (_, rowIndex) => (
+        <tr key={rowIndex}>
+          {Array.from({ length: columns }, (_, colIndex) => (
+            <td key={colIndex}>
+              <Skeleton height={14} width={colIndex === 0 ? '70%' : '85%'} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 const sizeType = PropTypes.oneOfType([PropTypes.string, PropTypes.number]);
 
 Skeleton.propTypes = {
@@ -39,4 +57,9 @@ Skeleton.propTypes = {
   height: sizeType,
   radius: sizeType,
   style: PropTypes.object,
+};
+
+SkeletonTableRows.propTypes = {
+  rows: PropTypes.number,
+  columns: PropTypes.number,
 };

@@ -52,8 +52,12 @@ JWT_SECRET           = a long random string, NOT the placeholder
 JWT_EXPIRES_IN       = 7d
 NODE_ENV             = production          ← Render does not set this for you
 CLIENT_URL           = https://your-frontend.vercel.app   ← fill in after Step 3, no trailing slash
-SENDGRID_API_KEY     = SG.xxxxxxxxxxxxxxxxxxxxxxxx   ← Render's free tier blocks outbound SMTP, so this uses SendGrid's HTTPS API instead of Gmail/nodemailer
-EMAIL_FROM           = EV Management <your-verified-sender@example.com>
+SMTP_HOST            = smtp.gmail.com
+SMTP_PORT            = 587
+SMTP_SECURE          = false
+SMTP_USER            = your-address@gmail.com
+SMTP_PASS            = your-google-app-password
+EMAIL_FROM           = EV Management <your-address@gmail.com>
 OTP_EXPIRY_MINUTES   = 10
 MAX_VERIFICATION_ATTEMPTS = 3
 VERIFICATION_BLOCK_HOURS  = 1
@@ -227,23 +231,20 @@ cd backend && npm test      # expected: 126/126 passing (9 suites)
 | Every API call fails / instantly logged out | `VITE_API_URL` is wrong (missing `/api` or pointing at localhost). Fix and **redeploy** the frontend — Vite bakes it in at build time. |
 | `PrismaClientInitializationError` in Render logs | `DATABASE_URL` typo, or Atlas Network Access doesn't include `0.0.0.0/0`. |
 | `Unknown argument plannedEndTime` on booking | The schema wasn't synced/generated. Start the backend with `npm start` (its `prestart` hook syncs automatically), and make sure `npm install` completed (it runs `prisma generate`). |
-| OTP emails never arrive | `SENDGRID_API_KEY` missing/invalid, or `EMAIL_FROM` isn't a verified sender in SendGrid (Settings → Sender Authentication) — check Render's logs for the exact SendGrid error, or check spam. The app itself keeps working — email is fire-and-forget. |
+| OTP emails never arrive | Gmail App Password is invalid or the host blocks outbound SMTP — check `SMTP_*` values, backend logs, and spam. Use a host such as Railway that permits outbound SMTP. |
 | Refreshing `/dashboard` gives a 404 | SPA rewrite missing — `frontend/vercel.json` (Vercel) or a `_redirects` file with `/* /index.html 200` (Netlify). |
 | `setup-admin` returns **403** | `x-setup-key` header ≠ `ADMIN_SETUP_KEY` env var. |
 | `setup-admin` returns **409** | An admin already exists — just log in with it (this is the by-design one-time lock). |
 
 ---
 
-## SendGrid API Key Setup
+## Gmail SMTP Setup
 
-1. https://signup.sendgrid.com — free tier covers 100 emails/day.
-2. **Settings → Sender Authentication** → verify the address you'll put in
-   `EMAIL_FROM` (Single Sender Verification, no domain needed). Sends from an
-   unverified sender fail with a 403 even with a valid key.
-3. **Settings → API Keys → Create API Key** → Restricted Access → enable
-   **Mail Send**.
-4. Copy the key (starts with `SG.`, shown once) into Render's
-   `SENDGRID_API_KEY` env var.
+1. Enable 2-Step Verification on the sending Google account.
+2. Generate an App Password under Google Account → Security → App Passwords.
+3. Configure `SMTP_HOST=smtp.gmail.com`, port `587`, and `SMTP_SECURE=false`.
+4. Put the Gmail address in `SMTP_USER` and the App Password in `SMTP_PASS`.
+5. Deploy the SMTP backend on a host that permits outbound SMTP, such as Railway.
 
 ---
 
